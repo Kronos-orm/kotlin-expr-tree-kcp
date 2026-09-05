@@ -3,13 +3,21 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.gradle.api.tasks.compile.JavaCompile
 
 plugins {
-    kotlin("jvm") version "2.4.0" apply false
-    kotlin("kapt") version "2.4.0" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.kapt) apply false
+    alias(libs.plugins.expr.tree.publishing) apply false
 }
 
 allprojects {
     group = "com.kotlinorm.experimental"
-    version = "0.1.0-SNAPSHOT"
+    version = providers.gradleProperty("exprTreeVersion").getOrElse("0.1.0-SNAPSHOT")
+
+    configurations.configureEach {
+        resolutionStrategy.dependencySubstitution {
+            substitute(module("com.kotlinorm.experimental:expr-tree-compiler-plugin"))
+                .using(project(":expr-tree-compiler-plugin"))
+        }
+    }
 }
 
 subprojects {
@@ -24,4 +32,26 @@ subprojects {
             targetCompatibility = "1.8"
         }
     }
+}
+
+subprojects {
+    if (name in setOf("expr-tree-runtime", "expr-tree-compiler-plugin", "expr-tree-maven-plugin")) {
+        pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+            apply(plugin = "exprtree.publishing")
+        }
+    }
+}
+
+val publishableModules = listOf("expr-tree-runtime", "expr-tree-compiler-plugin", "expr-tree-maven-plugin")
+
+tasks.register("publishAllToMavenLocal") {
+    group = "publishing"
+    dependsOn(publishableModules.map { ":$it:publishToMavenLocal" })
+    dependsOn(gradle.includedBuild("expr-tree-gradle-plugin").task(":publishToMavenLocal"))
+}
+
+tasks.register("publishAllToMavenCentral") {
+    group = "publishing"
+    dependsOn(publishableModules.map { ":$it:publishAllPublicationsToMavenCentralRepository" })
+    dependsOn(gradle.includedBuild("expr-tree-gradle-plugin").task(":publishAllPublicationsToMavenCentralRepository"))
 }

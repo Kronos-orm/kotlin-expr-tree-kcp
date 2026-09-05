@@ -3,21 +3,20 @@ pluginManagement {
         gradlePluginPortal()
         mavenCentral()
     }
-
-    includeBuild("expr-tree-gradle-plugin")
-    includeBuild("build-logic")
+    includeBuild("../build-logic")
 }
 
 dependencyResolutionManagement {
+    versionCatalogs {
+        create("libs") {
+            from(files("../gradle/libs.versions.toml"))
+        }
+    }
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        gradlePluginPortal()
         mavenCentral()
     }
 }
 
-rootProject.name = "kotlin-expr-tree-kcp"
-
-include(":expr-tree-compiler-plugin")
-include(":expr-tree-runtime")
-include(":expr-tree-maven-plugin")
-include(":example")
+rootProject.name = "expr-tree-gradle-plugin"

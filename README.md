@@ -142,8 +142,8 @@ The Maven integration is registered as the Kotlin Maven extension
 
 ### Local Development
 
-The included `example` module loads the compiler-plugin JAR directly and provides
-a ready-to-run local integration environment:
+The included `example` module applies the Gradle plugin through the local
+included build and provides a ready-to-run integration environment:
 
 ```powershell
 .\gradlew.bat :example:test --no-daemon --rerun-tasks
@@ -183,4 +183,4 @@ diagnostics and capability reporting.
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE).

@@ -172,4 +172,4 @@ AST 路径提供自身的诊断和能力报告。
 
 ## License
 
-Apache License 2.0，详见 [LICENSE](LICENSE)。
+MIT License，详见 [LICENSE](LICENSE)。
