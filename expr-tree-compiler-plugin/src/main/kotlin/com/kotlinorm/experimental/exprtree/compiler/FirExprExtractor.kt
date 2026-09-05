@@ -37,9 +37,6 @@ import com.kotlinorm.experimental.exprtree.api.WhenExpr
 import com.kotlinorm.experimental.exprtree.api.WhenSubject
 import com.kotlinorm.experimental.exprtree.api.StringTemplateExpr
 import com.kotlinorm.experimental.exprtree.api.StringTemplatePart
-import org.jetbrains.kotlin.KtLightSourceElement
-import org.jetbrains.kotlin.KtPsiSourceElement
-import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirProperty
@@ -55,16 +52,19 @@ import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
 import org.jetbrains.kotlin.fir.expressions.FirLiteralExpression
 import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
+import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
 import org.jetbrains.kotlin.fir.expressions.FirSafeCallExpression
 import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.expressions.FirStringConcatenationCall
+import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression
 import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment
 import org.jetbrains.kotlin.fir.expressions.FirWhenBranch
 import org.jetbrains.kotlin.fir.expressions.FirWhenExpression
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
+import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
@@ -82,11 +82,12 @@ import org.jetbrains.kotlin.fir.types.resolvedType
  * IDs are allocated in source traversal order and are only emitted through the
  * generated runtime AST; no FIR object leaks into the public model.
  */
+@OptIn(SymbolInternals::class)
 internal class FirExprExtractor private constructor(
     private val parameters: Map<FirVariableSymbol<*>, DeclId>,
     private val ids: IdAllocator,
 ) {
-    private val capturesBySymbol = linkedMapOf<FirVariableSymbol<*>, CaptureDecl>()
+    private val capturesBySymbol = linkedMapOf<Any, CaptureDecl>()
     private val locals = linkedMapOf<FirVariableSymbol<*>, LocalDecl>()
     private var safeCallReceiver: ExprNode? = null
 
@@ -102,7 +103,7 @@ internal class FirExprExtractor private constructor(
             captures = capturesBySymbol.values.toList(),
             body = body,
             metadata = TreeMetadata(
-                producerVersion = "0.1.0-SNAPSHOT",
+                producerVersion = "0.1.0",
                 kotlinVersion = "2.4.0",
                 attributes = mapOf("producer" to "fir"),
             ),
@@ -155,6 +156,7 @@ internal class FirExprExtractor private constructor(
         is FirStringConcatenationCall -> stringTemplate(expression)
         is FirTypeOperatorCall -> typeOperator(expression)
         is FirAnonymousFunctionExpression -> nestedLambda(expression)
+        is FirThisReceiverExpression -> thisReceiver(expression)
         is FirCheckedSafeCallSubject -> safeCallReceiver ?: UnsupportedExpr(
             id(), typeOf(expression), "safe-call-subject-without-receiver", span(expression)
         )
@@ -177,19 +179,12 @@ internal class FirExprExtractor private constructor(
         type = typeOf(assignment),
         target = extract(assignment.lValue),
         value = extract(assignment.rValue),
-        operator = when (assignment.source?.elementType?.toString()) {
-            "PLUSEQ" -> AssignmentOperator.PLUS_ASSIGN
-            "MINUSEQ" -> AssignmentOperator.MINUS_ASSIGN
-            "MULTEQ" -> AssignmentOperator.TIMES_ASSIGN
-            "DIVEQ" -> AssignmentOperator.DIV_ASSIGN
-            "PERCEQ" -> AssignmentOperator.REM_ASSIGN
-            else -> AssignmentOperator.SET
-        },
+        operator = assignmentOperator(assignment.rValue),
         source = span(assignment),
     )
 
     private fun whenExpression(expression: FirWhenExpression): ExprNode {
-        if (expression.source?.elementType?.toString() == "IF") {
+        if (sourceElementTypeName(expression.source) == "IF") {
             val entries = expression.branches.map(::whenEntry)
             if (entries.size !in 1..2) return WhenExpr(id(), typeOf(expression), null, entries, span(expression))
             val first = entries.first()
@@ -317,7 +312,11 @@ internal class FirExprExtractor private constructor(
         val symbol = (expression.calleeReference as? FirResolvedNamedReference)?.resolvedSymbol
         val receiver = expression.explicitReceiver ?: expression.extensionReceiver ?: expression.dispatchReceiver
         val isSafeCallSelector = receiver is FirCheckedSafeCallSubject
-        val receiverNode = receiver?.takeUnless { it is FirCheckedSafeCallSubject }?.let(::extract)
+        // Object and class qualifiers are compile-time receivers. The callable id
+        // identifies their target without manufacturing an unsupported runtime node.
+        val receiverNode = receiver?.takeUnless {
+            it is FirCheckedSafeCallSubject || it is FirResolvedQualifier
+        }?.let(::extract)
         if (symbol is FirVariableSymbol<*> && receiverNode == null && !isSafeCallSelector) {
             val declaration = parameters[symbol]
             return if (declaration != null) {
@@ -326,6 +325,13 @@ internal class FirExprExtractor private constructor(
                 val local = locals[symbol]
                 if (local != null) {
                     RefExpr(id(), typeOf(expression), local.id, local.name, RefKind.LOCAL, span(expression))
+                } else if (symbol is FirPropertySymbol && !symbol.fir.isLocal) {
+                    // Top-level properties and static object properties are not
+                    // closure values. Preserve the resolved property reference so
+                    // consumers can decide whether and when to evaluate it.
+                    PropertyGetExpr(
+                        id(), typeOf(expression), callable(symbol, expression.calleeReference.name.asString()), null, span(expression)
+                    )
                 } else {
                     val capture = capture(symbol, expression.calleeReference.name.asString(), typeOf(expression))
                     RefExpr(id(), typeOf(expression), capture.id, capture.name, RefKind.CAPTURE, span(expression))
@@ -335,6 +341,22 @@ internal class FirExprExtractor private constructor(
         return PropertyGetExpr(
             id(), typeOf(expression), callable(symbol, expression.calleeReference.name.asString()), receiverNode, span(expression)
         )
+    }
+
+    private fun thisReceiver(expression: FirThisReceiverExpression): ExprNode {
+        val name = expression.calleeReference.labelName.orEmpty().ifBlank { "this" }
+        val boundSymbol = expression.calleeReference.boundSymbol ?: return UnsupportedExpr(
+            id(), typeOf(expression), "this-without-bound-symbol", span(expression)
+        )
+        val capture = capturesBySymbol.getOrPut(boundSymbol) {
+            CaptureDecl(
+                id = ids.declaration(),
+                name = name,
+                type = typeOf(expression),
+                captureKind = CaptureKind.THIS,
+            )
+        }
+        return RefExpr(id(), typeOf(expression), capture.id, capture.name, RefKind.THIS, span(expression))
     }
 
     private fun call(expression: FirFunctionCall): ExprNode {
@@ -367,14 +389,15 @@ internal class FirExprExtractor private constructor(
         )
     }
 
-    private fun capture(symbol: FirVariableSymbol<*>, name: String, type: TypeRef): CaptureDecl =
+    private fun capture(symbol: Any, name: String, type: TypeRef): CaptureDecl =
         capturesBySymbol.getOrPut(symbol) {
+            val variable = symbol as? FirVariableSymbol<*>
             CaptureDecl(
                 id = ids.declaration(),
                 name = name,
                 type = type,
-                captureKind = if (symbol.isVar) CaptureKind.MUTABLE_CELL else CaptureKind.VALUE,
-                mutable = symbol.isVar,
+                captureKind = if (variable?.isVar == true) CaptureKind.MUTABLE_CELL else CaptureKind.VALUE,
+                mutable = variable?.isVar == true,
             )
         }
 
@@ -413,7 +436,7 @@ internal class FirExprExtractor private constructor(
         )
     }
 
-    private fun span(element: FirElement): SourceSpan? = span(
+    private fun span(element: FirElement): SourceSpan? = spanFrom(
         when (element) {
             is FirStatement -> element.source
             is FirDeclaration -> element.source
@@ -422,17 +445,47 @@ internal class FirExprExtractor private constructor(
         }
     )
 
-    private fun span(source: KtSourceElement?): SourceSpan? {
+    /** Keeps source metadata without exposing compiler PSI classes in the runtime model. */
+    private fun spanFrom(source: Any?): SourceSpan? {
         source ?: return null
-        val psiSource = when (source) {
-            is KtPsiSourceElement -> source
-            is KtLightSourceElement -> source.unwrapToKtPsiSourceElement()
-        }
-        val fileId = psiSource?.psi?.containingFile?.virtualFile?.path
-            ?: psiSource?.psi?.containingFile?.name
-            ?: "<unknown>"
-        return SourceSpan(fileId, source.startOffset, source.endOffset)
+        val startOffset = invokeInt(source, "getStartOffset") ?: return null
+        val endOffset = invokeInt(source, "getEndOffset") ?: return null
+        val psi = invoke(source, "getPsi")
+        val containingFile = psi?.let { invoke(it, "getContainingFile") }
+        val virtualFile = containingFile?.let { invoke(it, "getVirtualFile") }
+        val fileId = (virtualFile?.let { invokeString(it, "getPath") }
+            ?: containingFile?.let { invokeString(it, "getName") }
+            ?: "<unknown>")
+        return SourceSpan(fileId, startOffset, endOffset)
     }
+
+    /** Reads compiler source metadata without linking against a particular IntelliJ PSI ABI. */
+    private fun sourceElementTypeName(source: Any?): String? = runCatching {
+        source?.javaClass?.methods
+            ?.firstOrNull { it.name == "getElementType" && it.parameterCount == 0 }
+            ?.invoke(source)
+            ?.toString()
+    }.getOrNull()
+
+    private fun assignmentOperator(rValue: FirExpression): AssignmentOperator {
+        val operationName = (rValue as? FirFunctionCall)?.calleeReference?.name?.asString()
+        return when (operationName) {
+            "plus" -> AssignmentOperator.PLUS_ASSIGN
+            "minus" -> AssignmentOperator.MINUS_ASSIGN
+            "times" -> AssignmentOperator.TIMES_ASSIGN
+            "div" -> AssignmentOperator.DIV_ASSIGN
+            "rem" -> AssignmentOperator.REM_ASSIGN
+            else -> AssignmentOperator.SET
+        }
+    }
+
+    private fun invoke(target: Any, methodName: String): Any? = runCatching {
+        target.javaClass.methods.firstOrNull { it.name == methodName && it.parameterCount == 0 }?.invoke(target)
+    }.getOrNull()
+
+    private fun invokeInt(target: Any, methodName: String): Int? = invoke(target, methodName) as? Int
+
+    private fun invokeString(target: Any, methodName: String): String? = invoke(target, methodName) as? String
 
     private class IdAllocator(parameterCount: Int) {
         private var nextExpression = 1L

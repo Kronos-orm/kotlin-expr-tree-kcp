@@ -55,6 +55,7 @@ import org.jetbrains.kotlin.ir.util.functions
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.ir.util.getValueArgument
 import org.jetbrains.kotlin.ir.util.isVararg
+import org.jetbrains.kotlin.ir.util.deepCopyWithoutPatchingParents
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
@@ -122,7 +123,7 @@ internal class ExprTreeIrGenerationExtension : IrGenerationExtension {
                 val captureCandidate = owner is IrValueParameter ||
                     (owner is IrVariable && owner.origin == IrDeclarationOrigin.DEFINED)
                 if (!ownParameters.contains(expression.symbol) && !ownLocals.contains(expression.symbol) && captureCandidate) {
-                    values.putIfAbsent(expression.symbol, expression)
+                    values.putIfAbsent(expression.symbol, expression.deepCopyWithoutPatchingParents())
                 }
             }
         })
@@ -212,6 +213,16 @@ private class ExprTreeIrEmitter(
         is SafeCallExpr -> new("com.kotlinorm.experimental.exprtree.api.SafeCallExpr", exprId(value.id.value), type(value.type), node(value.receiver), node(value.selector), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is ElvisExpr -> new("com.kotlinorm.experimental.exprtree.api.ElvisExpr", exprId(value.id.value), type(value.type), node(value.left), node(value.right), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is BlockExpr -> new("com.kotlinorm.experimental.exprtree.api.BlockExpr", exprId(value.id.value), type(value.type), list("com.kotlinorm.experimental.exprtree.api.ExprNode", value.statements.map(::node)), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
+        is com.kotlinorm.experimental.exprtree.api.LambdaExpr -> new(
+            "com.kotlinorm.experimental.exprtree.api.LambdaExpr",
+            exprId(value.id.value),
+            type(value.type),
+            list("com.kotlinorm.experimental.exprtree.api.ParameterDecl", value.parameters.map(::parameter)),
+            list("com.kotlinorm.experimental.exprtree.api.CaptureDecl", value.captures.map(::capture)),
+            value.body?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprNode"),
+            source(value.source),
+            nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"),
+        )
         is LocalDeclarationExpr -> new("com.kotlinorm.experimental.exprtree.api.LocalDeclarationExpr", exprId(value.id.value), type(value.type), local(value.declaration), value.initializer?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprNode"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is AssignmentExpr -> new("com.kotlinorm.experimental.exprtree.api.AssignmentExpr", exprId(value.id.value), type(value.type), node(value.target), node(value.value), enum("com.kotlinorm.experimental.exprtree.api.AssignmentOperator", value.operator.name), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is IfExpr -> new("com.kotlinorm.experimental.exprtree.api.IfExpr", exprId(value.id.value), type(value.type), node(value.condition), node(value.thenBranch), value.elseBranch?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprNode"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
@@ -220,7 +231,7 @@ private class ExprTreeIrEmitter(
         is StringTemplateExpr -> new("com.kotlinorm.experimental.exprtree.api.StringTemplateExpr", exprId(value.id.value), type(value.type), list("com.kotlinorm.experimental.exprtree.api.StringTemplatePart", value.parts.map(::stringPart)), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is TypeOperatorExpr -> new("com.kotlinorm.experimental.exprtree.api.TypeOperatorExpr", exprId(value.id.value), type(value.type), enum("com.kotlinorm.experimental.exprtree.api.TypeOperator", value.operator.name), node(value.operand), type(value.targetType), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is UnsupportedExpr -> new("com.kotlinorm.experimental.exprtree.api.UnsupportedExpr", exprId(value.id.value), type(value.type), builder.irString(value.reason), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
-        else -> new("com.kotlinorm.experimental.exprtree.api.UnsupportedExpr", exprId(value.id.value), type(value.type), builder.irString("KET005: generated bridge does not support nested lambda"), nullOf("com.kotlinorm.experimental.exprtree.api.SourceSpan"), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
+        else -> new("com.kotlinorm.experimental.exprtree.api.UnsupportedExpr", exprId(value.id.value), type(value.type), builder.irString("KET005: generated bridge does not support ${value::class.simpleName}"), nullOf("com.kotlinorm.experimental.exprtree.api.SourceSpan"), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
     }
 
     private fun callable(id: String, operator: Boolean, kind: CallableKind): IrExpression = new(

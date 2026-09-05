@@ -38,7 +38,10 @@ data class CallableRef(
     val valueParameters: List<ValueParameterRef> = emptyList(),
     val isFakeOverride: Boolean = false,
     val overriddenCallableIds: List<String> = emptyList(),
-)
+) {
+    val name: String
+        get() = callableId.substringAfterLast('.')
+}
 
 enum class CallableKind { FUNCTION, PROPERTY, GETTER, SETTER, CONSTRUCTOR, OPERATOR, CLASSIFIER, UNKNOWN }
 

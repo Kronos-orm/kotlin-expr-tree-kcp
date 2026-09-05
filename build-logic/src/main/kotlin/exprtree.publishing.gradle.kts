@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.kotlinorm.experimental"
-version = providers.gradleProperty("exprTreeVersion").getOrElse("0.1.0-SNAPSHOT")
+version = providers.gradleProperty("exprTreeVersion").getOrElse("0.1.0")
 
 configure<MavenPublishBaseExtension> {
     val platform = if (pluginManager.hasPlugin("java-gradle-plugin")) {
@@ -23,7 +23,7 @@ configure<MavenPublishBaseExtension> {
     pom {
         name.set("${group}:${project.name}")
         description.set("Kotlin expression tree ${project.name} module")
-        url.set("https://github.com/ousc/kotlin-expr-tree-kcp")
+        url.set("https://github.com/Kronos-orm/kotlin-expr-tree-kcp")
         licenses {
             license {
                 name.set("MIT License")
@@ -39,9 +39,9 @@ configure<MavenPublishBaseExtension> {
             }
         }
         scm {
-            url.set("https://github.com/ousc/kotlin-expr-tree-kcp")
-            connection.set("scm:git:https://github.com/ousc/kotlin-expr-tree-kcp.git")
-            developerConnection.set("scm:git:ssh://git@github.com/ousc/kotlin-expr-tree-kcp.git")
+            url.set("https://github.com/Kronos-orm/kotlin-expr-tree-kcp")
+            connection.set("scm:git:https://github.com/Kronos-orm/kotlin-expr-tree-kcp.git")
+            developerConnection.set("scm:git:ssh://git@github.com/Kronos-orm/kotlin-expr-tree-kcp.git")
         }
     }
 

@@ -5,12 +5,13 @@ import org.gradle.api.tasks.compile.JavaCompile
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.kapt) apply false
+    alias(libs.plugins.kover) apply false
     alias(libs.plugins.expr.tree.publishing) apply false
 }
 
 allprojects {
     group = "com.kotlinorm.experimental"
-    version = providers.gradleProperty("exprTreeVersion").getOrElse("0.1.0-SNAPSHOT")
+    version = providers.gradleProperty("exprTreeVersion").getOrElse("0.1.0")
 
     configurations.configureEach {
         resolutionStrategy.dependencySubstitution {

@@ -5,5 +5,4 @@ plugins {
 
 dependencies {
     implementation(project(":expr-tree-runtime"))
-    testImplementation(libs.kotlin.test)
 }

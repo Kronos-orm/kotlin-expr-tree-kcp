@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.test.assertNull
 
 class ExprTreeTest {
     @Test
@@ -33,6 +34,7 @@ class ExprTreeTest {
         assertEquals(user.id, (age.receiver as RefExpr).declaration)
         assertEquals(minimum.id, (predicate.right as RefExpr).declaration)
         assertIs<BinaryExpr>(tree.body)
+        assertEquals("compareTo", predicate.operator.name)
     }
 
     @Test
@@ -178,6 +180,33 @@ class ExprTreeTest {
 
         assertTrue(original in whenExpr.children())
         assertEquals(replacement, transformed.subject?.initializer)
+    }
+
+    @Test
+    fun `find resolves valid paths and rejects empty missing or foreign paths`() {
+        val leaf = ConstExpr(ExprId(70), TypeRef("kotlin.Int"), 1)
+        val root = BinaryExpr(ExprId(71), TypeRef("kotlin.Int"), CallableRef("kotlin.Int.plus"), leaf, leaf.copy(id = ExprId(72)))
+        assertEquals(leaf, root.find(ExprPath(listOf(ExprId(71), ExprId(70)))))
+        assertNull(root.find(ExprPath()))
+        assertNull(root.find(ExprPath(listOf(ExprId(99)))))
+        assertNull(root.find(ExprPath(listOf(ExprId(71), ExprId(98)))))
+    }
+
+    @Test
+    fun `validation reports duplicate ids and invalid when subject spans`() {
+        val duplicate = ConstExpr(ExprId(80), TypeRef("kotlin.Int"), 1)
+        val invalidSubject = WhenExpr(
+            ExprId(81), TypeRef("kotlin.Int"),
+            WhenSubject(LocalDecl(DeclId(81), "subject", duplicate.type), duplicate, SourceSpan("x.kt", 4, 2)),
+            listOf(WhenEntryExpr(ExprId(82), TypeRef("kotlin.Int"), emptyList(), duplicate, true)),
+        )
+        val diagnostics = ExprTree<Any?, Int>(
+            parameters = emptyList(),
+            captures = emptyList(),
+            body = BlockExpr(ExprId(83), duplicate.type, listOf(duplicate, duplicate, invalidSubject)),
+        ).validate()
+        assertTrue(diagnostics.any { it.code == "KET100" })
+        assertTrue(diagnostics.any { it.code == "KET101" && it.message.contains("when subject") })
     }
 
     private fun ExprNode.debugTreeForTest(): String = ExprTree<Any?, Any?>(

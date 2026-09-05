@@ -3,6 +3,7 @@ package com.kotlinorm.experimental.exprtree.api
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CaptureApiTest {
@@ -42,5 +43,37 @@ class CaptureApiTest {
         assertEquals(18, captured.bindings()[capture.id])
         assertTrue("sample#1" in ExprTreeRegistry.keys())
         assertFailsWith<ExprTreeAbiException> { ExprTreeRegistry.lookup("missing") }
+    }
+
+    @Test
+    fun `capture carrier preserves invocation and nullable lookup`() {
+        val executable: (Any) -> Boolean = { it is Int && it > 0 }
+        assertNull(executable.capturedExprOrNull())
+        val carrier = CapturedLambda<Any, Boolean>(executable, CapturedExpr(tree, arrayOf<Any?>(18)))
+        assertEquals(true, carrier(2))
+        assertEquals(carrier.capturedExpr, carrier.capturedExprOrNull())
+        assertEquals(carrier.capturedExpr, carrier.capturedExpr)
+        assertEquals(carrier.capturedExpr.hashCode(), carrier.capturedExpr.hashCode())
+    }
+
+    @Test
+    fun `registry rejects blank keys incompatible schemas and conflicting values`() {
+        assertFailsWith<IllegalArgumentException> { ExprTreeRegistry.register("", tree) }
+        assertFailsWith<IllegalArgumentException> {
+            ExprTreeRegistry.register("bad-schema", tree.copy(schemaVersion = 99))
+        }
+        ExprTreeRegistry.register("conflict", tree)
+        assertFailsWith<IllegalArgumentException> {
+            ExprTreeRegistry.register("conflict", tree.copy(body = ConstExpr(ExprId(2), tree.body.type, false)))
+        }
+        assertFailsWith<ExprTreeAbiException> { captureTree<Any, Boolean>("missing", emptyArray()) }
+    }
+
+    @Test
+    fun `capture bindings reject duplicate declarations`() {
+        assertFailsWith<IllegalArgumentException> {
+            CaptureBindings.of(CaptureBinding(DeclId(1), 1), CaptureBinding(DeclId(1), 2))
+        }
+        assertEquals(mapOf(DeclId(1) to "x"), CaptureBindings.of(CaptureBinding(DeclId(1), "x")).asMap())
     }
 }

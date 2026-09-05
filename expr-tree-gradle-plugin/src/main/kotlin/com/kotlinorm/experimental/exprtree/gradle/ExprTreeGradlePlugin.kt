@@ -16,7 +16,7 @@ class ExprTreeGradlePlugin : KotlinCompilerPluginSupportPlugin {
     override fun getPluginArtifact(): SubpluginArtifact = SubpluginArtifact(
         groupId = "com.kotlinorm.experimental",
         artifactId = "expr-tree-compiler-plugin",
-        version = "0.1.0-SNAPSHOT",
+        version = "0.1.0",
     )
 
     override fun applyToCompilation(kotlinCompilation: KotlinCompilation<*>): org.gradle.api.provider.Provider<List<SubpluginOption>> =

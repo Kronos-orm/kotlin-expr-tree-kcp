@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640" role="img" aria-labelledby="title desc">
+  <title id="title">Kotlin Expression Tree KCP logo</title>
+  <desc id="desc">A clear lowercase lambda glyph surrounded by connected expression tree nodes.</desc>
+  <defs>
+    <linearGradient id="lambda" x1="166" y1="196" x2="469" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A8F3DE"/>
+      <stop offset=".48" stop-color="#57DCC4"/>
+      <stop offset="1" stop-color="#48B9EF"/>
+    </linearGradient>
+    <linearGradient id="root" x1="289" y1="84" x2="353" y2="148" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A8F3DE"/>
+      <stop offset="1" stop-color="#5CD4F3"/>
+    </linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#08101D" flood-opacity=".28"/>
+    </filter>
+  </defs>
+
+  <rect x="24" y="24" width="592" height="592" rx="136" fill="#101A2B" filter="url(#shadow)"/>
+
+  <!-- Expression-tree branches sit behind the lambda mark. -->
+  <g fill="none" stroke="#8EA5BC" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".72">
+    <path d="M320 124 L180 236 L150 332"/>
+    <path d="M320 124 L460 236 L490 332"/>
+    <path d="M180 236 L255 332"/>
+    <path d="M460 236 L385 332"/>
+    <path d="M255 332 L306 506"/>
+    <path d="M385 332 L334 506"/>
+  </g>
+
+  <!-- The central mark is intentionally the lowercase lambda glyph. -->
+  <text x="322" y="466" text-anchor="middle" fill="url(#lambda)" font-family="Georgia, 'Times New Roman', serif" font-size="370" font-style="italic" font-weight="700">&#955;</text>
+  <text x="322" y="466" text-anchor="middle" fill="none" stroke="#E8FFF8" stroke-width="2" stroke-opacity=".32" font-family="Georgia, 'Times New Roman', serif" font-size="370" font-style="italic" font-weight="700">&#955;</text>
+
+  <!-- AST / capture nodes retain the previous palette. -->
+  <g filter="url(#shadow)">
+    <circle cx="320" cy="124" r="36" fill="url(#root)" stroke="#E5FFF8" stroke-width="8"/>
+    <circle cx="180" cy="236" r="28" fill="#B58CFF" stroke="#F0E8FF" stroke-width="8"/>
+    <circle cx="460" cy="236" r="28" fill="#FFB86B" stroke="#FFF0DB" stroke-width="8"/>
+    <circle cx="150" cy="332" r="25" fill="#57DCC4" stroke="#D9FFF5" stroke-width="7"/>
+    <circle cx="255" cy="332" r="22" fill="#B58CFF" stroke="#F0E8FF" stroke-width="7"/>
+    <circle cx="385" cy="332" r="22" fill="#FFB86B" stroke="#FFF0DB" stroke-width="7"/>
+    <circle cx="490" cy="332" r="25" fill="#57DCC4" stroke="#D9FFF5" stroke-width="7"/>
+    <circle cx="306" cy="506" r="25" fill="#55C7F0" stroke="#E2F8FF" stroke-width="8"/>
+    <circle cx="334" cy="506" r="25" fill="#55C7F0" stroke="#E2F8FF" stroke-width="8"/>
+  </g>
+
+  <g fill="#101A2B">
+    <circle cx="320" cy="124" r="8"/>
+    <circle cx="180" cy="236" r="6"/>
+    <circle cx="460" cy="236" r="6"/>
+    <circle cx="306" cy="506" r="6"/>
+    <circle cx="334" cy="506" r="6"/>
+  </g>
+</svg>

@@ -1,34 +1,51 @@
 # Kotlin Expression Tree KCP
 
+[![Kotlin](https://img.shields.io/badge/kotlin-2.4.0-%237f52ff.svg?logo=kotlin)](https://kotlinlang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/ci.yml)
+[![Coverage](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/raw/coverage/coverage-compiler-plugin.svg)](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/coverage.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/com.kotlinorm.experimental/expr-tree-runtime.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.kotlinorm.experimental/expr-tree-runtime)
+
 English | [简体中文](README-zh_CN.md)
 
+<p align="center">
+  <img src="branding/expr-tree-logo.svg" alt="Kotlin Expression Tree KCP logo" width="180">
+</p>
+
+<p align="center"><strong>Expression trees for annotated Kotlin lambdas.</strong></p>
+
 Kotlin Expression Tree KCP is a Kotlin 2.4.0 K2/FIR compiler plugin that turns
-an annotated Kotlin lambda into a compiler-independent expression tree. The
-tree is a sealed algebraic data type, so a consumer can inspect and transform
-it with ordinary Kotlin `when` expressions and extension functions.
+an annotated Kotlin lambda into an expression tree represented by Kotlin
+runtime model types. The tree is a sealed algebraic data type (ADT) represented
+by Kotlin's `sealed interface`. Application code can inspect and transform the
+tree with ordinary Kotlin `when` expressions and extension functions.
 
-The runtime tree is a foundation for query engines, rules engines, policy
-evaluators, code generators, and other Kotlin-native expression consumers.
+The generated tree provides the AST layer for query engines, rule engines,
+policy evaluators, code generators, and other Kotlin expression-processing
+systems.
 
-## Why This Project
+## What This Library Can Do
 
-- **Kotlin-native input**: write normal Kotlin expressions in the language you already use.
-- **Compile-time extraction**: FIR resolves symbols, overloads, receivers, and types.
-- **Closed runtime model**: `ExprNode` is a `sealed interface` with immutable data nodes.
-- **Correct captures**: closure values are bound by stable declaration identity.
-- **DSL-ready lambdas**: annotated function parameters receive callable lambdas with generated trees.
-- **Portable runtime**: runtime consumers receive plain Kotlin model objects with source information.
-- **Kotlin 2.4.0 baseline**: the initial plugin targets one K2 compiler line for predictable behavior.
+The library provides compile-time extraction and runtime APIs for annotated
+Kotlin lambdas:
+
+- **Extract annotated Kotlin lambdas as expression trees**: the K2/FIR compiler plugin replaces the `expr` marker call at the call site with a `CapturedExpr<T, R>` containing an `ExprTree<T, R>` and the lambda's captured values.
+- **Preserve resolved Kotlin semantics**: FIR resolves overloads and records the selected callable identity, receiver type, expression types, and source spans in the runtime model.
+- **Model the tree as a sealed algebraic data type (ADT)**: `ExprNode` is a Kotlin `sealed interface` with data-class nodes and read-only properties for calls, operators, properties, control flow, lambdas, string templates, declarations, assignments, type operators, and unsupported expressions.
+- **Bind closure captures by declaration identity**: captured values are exposed through `CaptureBindings` and can be looked up by `DeclId`, including code with shadowed names.
+- **Attach captured trees to callable DSL lambdas**: `@ExprCapture` lets a lambda remain callable for in-memory execution while exposing its generated `CapturedExpr` for query, rule, or policy compilation.
+- **Inspect and transform trees at runtime**: runtime APIs provide traversal, validation, source-aware diagnostics, transformations, and ABI checks over Kotlin model objects.
+- **Integrate extraction with Gradle and Maven**: the supplied plugins connect the expression-tree compiler plugin to Kotlin 2.4.0 builds.
 
 ## Modules
 
-| Module | Purpose |
-| --- | --- |
-| `expr-tree-runtime` | Public API, sealed AST, declarations, source spans, traversal, transforms, validation, capture binding, and ABI checks. |
-| `expr-tree-compiler-plugin` | Kotlin K2/FIR checker and IR call-site bridge. |
-| `expr-tree-gradle-plugin` | Gradle `KotlinCompilerPluginSupportPlugin` integration. |
-| `expr-tree-maven-plugin` | Kotlin Maven compiler-plugin extension integration. |
-| `example` | Local consumer, end-to-end compiler fixtures, and a test-scope query-adapter demonstration. |
+| Module                      | Purpose                                                                                                                                    |
+|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| `expr-tree-runtime`         | Runtime API, sealed AST model (ADT), declarations, source spans, traversal, transformations, validation, capture bindings, and ABI checks. |
+| `expr-tree-compiler-plugin` | Kotlin K2/FIR checker and IR call-site bridge.                                                                                             |
+| `expr-tree-gradle-plugin`   | Gradle `KotlinCompilerPluginSupportPlugin` integration.                                                                                    |
+| `expr-tree-maven-plugin`    | Kotlin Maven compiler plugin extension integration.                                                                                        |
+| `example`                   | Example application and Kotlin DSL integration sample.                                                                                     |
 
 ## Quick Look
 
@@ -40,8 +57,8 @@ fun predicate(minimum: Int, prefix: String) = expr<User, Boolean> { user ->
 }
 ```
 
-The compiler replaces the marker call at the call site. At runtime, the result
-contains an `ExprTree<User, Boolean>` and the captured values:
+At the call site, the compiler plugin generates a `CapturedExpr<User, Boolean>`
+containing an `ExprTree<User, Boolean>` and its captured values:
 
 ```kotlin
 val captured = predicate(18, "A")
@@ -49,7 +66,7 @@ val tree = captured.tree
 val minimum = captured.bindings()[tree.captures[0].id]
 ```
 
-The AST can be consumed exhaustively:
+The sealed AST can be handled exhaustively with a Kotlin `when` expression:
 
 ```kotlin
 fun render(node: ExprNode): String = when (node) {
@@ -79,10 +96,10 @@ fun render(node: ExprNode): String = when (node) {
 }
 ```
 
-## Direct DSL Capture
+## Capturing Lambdas in a DSL
 
-Framework APIs mark lambda parameters with `@ExprCapture`. At annotated call
-sites, the plugin supplies a callable lambda that also carries its generated
+When a DSL function parameter is annotated with `@ExprCapture`, the plugin wraps
+the lambda argument at each call site as a callable value carrying its generated
 `CapturedExpr`.
 
 ```kotlin
@@ -97,7 +114,7 @@ fun <T, R> Query<T>.map(@ExprCapture transform: (T) -> R): Query<R> {
 }
 ```
 
-Consumers keep the DSL entirely Kotlin-native:
+The calling code remains ordinary Kotlin DSL:
 
 ```kotlin
 query<User>()
@@ -105,32 +122,32 @@ query<User>()
     .map { "${it.name}-$prefix" }
 ```
 
-Each chain step receives its own tree and lexical capture bindings, while the
-original function value remains callable for in-memory execution.
+Each step in the chain carries its own tree and lexical capture bindings, and
+the original function value remains callable for in-memory execution.
 
 ## Integration
 
-The snippets below use the coordinates produced by this repository. Replace
-`0.1.0-SNAPSHOT` with the released version and add the repository that hosts
-your build artifacts.
+The examples use version `0.1.0`. Configure a repository that contains these
+artifacts, such as Maven Central or your project's artifact repository.
 
 ### Gradle Kotlin DSL
 
 ```kotlin
 plugins {
     kotlin("jvm") version "2.4.0"
-    id("com.kotlinorm.experimental.expr-tree") version "0.1.0-SNAPSHOT"
+    id("com.kotlinorm.experimental.expr-tree") version "0.1.0"
 }
 
 repositories { mavenCentral() }
 
 dependencies {
-    implementation("com.kotlinorm.experimental:expr-tree-runtime:0.1.0-SNAPSHOT")
+    implementation("com.kotlinorm.experimental:expr-tree-runtime:0.1.0")
 }
 ```
 
 The Gradle plugin applies `expr-tree-compiler-plugin` to Kotlin compilations.
-Application source uses `expr-tree-runtime`; the Gradle plugin supplies the compiler integration.
+Add `expr-tree-runtime` to the application dependencies; the Gradle plugin supplies
+the compiler integration.
 
 ### Maven
 
@@ -142,7 +159,7 @@ The Maven integration is registered as the Kotlin Maven extension
   <dependency>
     <groupId>com.kotlinorm.experimental</groupId>
     <artifactId>expr-tree-runtime</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
   </dependency>
 </dependencies>
 
@@ -162,7 +179,7 @@ The Maven integration is registered as the Kotlin Maven extension
         <dependency>
           <groupId>com.kotlinorm.experimental</groupId>
           <artifactId>expr-tree-maven-plugin</artifactId>
-          <version>0.1.0-SNAPSHOT</version>
+          <version>0.1.0</version>
         </dependency>
       </dependencies>
     </plugin>
@@ -172,43 +189,43 @@ The Maven integration is registered as the Kotlin Maven extension
 
 ### Local Development
 
-The included `example` module applies the Gradle plugin through the local
-included build and provides a ready-to-run integration environment:
+The `example` module uses the Gradle plugin from the included build and provides
+a ready-to-run Kotlin DSL integration sample:
 
 ```powershell
-.\gradlew.bat :example:test --no-daemon --rerun-tasks
+.\gradlew.bat :example:build --no-daemon --rerun-tasks
 ```
 
 ## Supported Expression Forms
 
-The current fixtures cover literals, parameter/local/capture references,
-property reads, function and operator calls, boolean logic, comparisons,
-equality, safe calls, Elvis, blocks, nested lambdas, local declarations,
-assignments, expression-valued `if`, subjectless and subject-style `when`,
-string templates, `is`/`!is`/`as`/`as?`, source spans, and shadowing. A
-subject-style `when (value)` is represented by a
-`WhenSubject` containing one initializer and a stable local declaration used by
-branch conditions.
+The compiler-plugin test fixtures cover literals, parameter, local-variable,
+and captured-value references; property access; function and operator calls;
+boolean logic; comparisons; equality checks; safe calls; Elvis expressions;
+blocks; nested lambdas; local declarations; assignments; expression-valued
+`if`; subjectless and subject-style `when`; string templates;
+`is`/`!is`/`as`/`as?`; source spans; and shadowing. A subject-style
+`when (value)` is represented by a `WhenSubject` that stores the initializer
+once and provides a stable local declaration for branch conditions.
 
-The extracted tree is ready for adaptation, analysis, transformation, and code
-generation. Domain backends can use source spans and AST paths for their own
-diagnostics and capability reporting.
+Runtime APIs expose the tree to domain adapters, analyzers, transformers, and
+code generators. Adapters can use source spans and AST paths to report
+diagnostics.
 
 ## Requirements
 
-| Dependency | Version |
-| --- | --- |
-| JDK | 8+; this repository is verified with JDK 17 |
-| Kotlin | 2.4.0 |
-| Gradle | 9.6.1 wrapper included; compatible Gradle versions may be used |
-| Maven | 3.9+ for the Maven integration |
+| Dependency | Version                                                 |
+|------------|---------------------------------------------------------|
+| JDK        | 17+ for building; generated JVM bytecode targets Java 8 |
+| Kotlin     | 2.4.0                                                   |
+| Gradle     | 9.6.1 wrapper included                                  |
+| Maven      | 3.9+ for the Maven integration                          |
 
 ## Build and Test
 
 ```powershell
 .\gradlew.bat check --no-daemon --rerun-tasks
 .\gradlew.bat :expr-tree-runtime:test --no-daemon --rerun-tasks
-.\gradlew.bat :example:test --no-daemon --rerun-tasks
+.\gradlew.bat :example:build --no-daemon --rerun-tasks
 ```
 
 ## License

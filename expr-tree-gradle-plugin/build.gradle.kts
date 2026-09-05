@@ -9,7 +9,7 @@ dependencies {
 }
 
 group = "com.kotlinorm.experimental"
-version = providers.gradleProperty("exprTreeVersion").getOrElse("0.1.0-SNAPSHOT")
+version = providers.gradleProperty("exprTreeVersion").getOrElse("0.1.0")
 
 java {
     sourceCompatibility = JavaVersion.VERSION_1_8

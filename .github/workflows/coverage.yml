@@ -1,0 +1,83 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  coverage:
+    name: Kover coverage gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Run coverage gates and reports
+        run: |
+          set -euo pipefail
+          bash ./gradlew :expr-tree-runtime:koverXmlReport :expr-tree-compiler-plugin:koverXmlReport \
+            :expr-tree-runtime:koverVerify :expr-tree-compiler-plugin:koverVerify \
+            --no-daemon --console=plain
+      - name: Read coverage values
+        id: values
+        run: |
+          set -euo pipefail
+          read_coverage() {
+            local report="$1"
+            local type="$2"
+            local counter
+            counter=$(grep "<counter type=\"$type\"" "$report" | tail -n1)
+            local missed covered total
+            missed=$(printf '%s\n' "$counter" | sed -E 's/.*missed="([0-9]+)".*/\1/')
+            covered=$(printf '%s\n' "$counter" | sed -E 's/.*covered="([0-9]+)".*/\1/')
+            total=$((missed + covered))
+            if [ "$total" -gt 0 ]; then
+              awk -v covered="$covered" -v total="$total" 'BEGIN { printf "%.1f", covered * 100 / total }'
+            else
+              printf '0.0'
+            fi
+          }
+          echo "compiler_line=$(read_coverage expr-tree-compiler-plugin/build/reports/kover/report.xml LINE)" >> "$GITHUB_OUTPUT"
+          echo "compiler_branch=$(read_coverage expr-tree-compiler-plugin/build/reports/kover/report.xml BRANCH)" >> "$GITHUB_OUTPUT"
+          echo "runtime_line=$(read_coverage expr-tree-runtime/build/reports/kover/report.xml LINE)" >> "$GITHUB_OUTPUT"
+          echo "runtime_branch=$(read_coverage expr-tree-runtime/build/reports/kover/report.xml BRANCH)" >> "$GITHUB_OUTPUT"
+          mkdir -p coverage
+      - name: Generate compiler coverage badge
+        if: github.event_name != 'pull_request'
+        uses: emibcn/badge-action@v2.0.3
+        with:
+          label: compiler line coverage
+          status: ${{ steps.values.outputs.compiler_line }}%
+          color: brightgreen
+          path: coverage/coverage-compiler-plugin.svg
+      - name: Generate runtime coverage badge
+        if: github.event_name != 'pull_request'
+        uses: emibcn/badge-action@v2.0.3
+        with:
+          label: runtime line coverage
+          status: ${{ steps.values.outputs.runtime_line }}%
+          color: brightgreen
+          path: coverage/coverage-runtime.svg
+      - name: Publish coverage badges
+        if: github.event_name != 'pull_request'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: coverage
+          folder: coverage
+          target-folder: .
+          clean: true
+          single-commit: true
+          silent: true
