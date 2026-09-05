@@ -63,7 +63,7 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.ClassId
 
-/** Emits direct model-constructor calls at each `expr { ... }` call site. */
+/** Emits runtime tree carriers for marker calls and annotated lambda parameters. */
 internal class ExprTreeIrGenerationExtension : IrGenerationExtension {
     @OptIn(UnsafeDuringIrConstructionAPI::class)
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
@@ -80,17 +80,31 @@ internal class ExprTreeIrGenerationExtension : IrGenerationExtension {
 
             override fun visitCall(expression: IrCall): IrExpression {
                 expression.transformChildrenVoid()
-                if (expression.symbol.owner.fqNameWhenAvailable?.asString() != MARKER_FQ_NAME) return expression
-                val tree = ExprCaptureRegistry.treeAt(expression.startOffset) ?: return expression
                 val builder = pluginContext.irBuiltIns.createIrBuilder(expression.symbol, expression.startOffset, expression.endOffset)
-                return ExprTreeIrEmitter(pluginContext, builder, currentFile).captured(tree, captureValues(expression))
+                val emitter = ExprTreeIrEmitter(pluginContext, builder, currentFile)
+                if (expression.symbol.owner.fqNameWhenAvailable?.asString() == MARKER_FQ_NAME) {
+                    val lambda = expression.arguments.getOrNull(0) as? IrFunctionExpression ?: return expression
+                    val tree = ExprCaptureRegistry.treeForLambdaAt(lambda.startOffset) ?: return expression
+                    return emitter.captured(tree, captureValues(lambda))
+                }
+                expression.arguments.forEachIndexed { index, argument ->
+                    val lambda = argument as? IrFunctionExpression
+                        ?: return@forEachIndexed
+                    val tree = ExprCaptureRegistry.treeForLambdaAt(lambda.startOffset)
+                        ?: return@forEachIndexed
+                    expression.arguments[index] = emitter.capturedLambda(
+                        lambda,
+                        tree,
+                        captureValues(lambda),
+                    )
+                }
+                return expression
             }
         }, null)
     }
 
     @OptIn(UnsafeDuringIrConstructionAPI::class)
-    private fun captureValues(call: IrCall): List<IrExpression> {
-        val lambda = call.arguments.getOrNull(0) as? IrFunctionExpression ?: return emptyList()
+    private fun captureValues(lambda: IrFunctionExpression): List<IrExpression> {
         val ownParameters = lambda.function.parameters.map { it.symbol }.toSet()
         val ownLocals = linkedSetOf<org.jetbrains.kotlin.ir.symbols.IrValueSymbol>()
         val values = linkedMapOf<org.jetbrains.kotlin.ir.symbols.IrValueSymbol, IrExpression>()
@@ -141,6 +155,16 @@ private class ExprTreeIrEmitter(
         treeExpr(tree),
         builder.irVararg(anyN, values),
         builder.irInt(1),
+    )
+
+    fun capturedLambda(
+        lambda: IrFunctionExpression,
+        tree: ExprTree<Any?, Any?>,
+        values: List<IrExpression>,
+    ): IrExpression = new(
+        "com.kotlinorm.experimental.exprtree.api.CapturedLambda",
+        lambda,
+        captured(tree, values),
     )
 
     private fun treeExpr(tree: ExprTree<Any?, Any?>): IrExpression = new(

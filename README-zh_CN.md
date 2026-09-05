@@ -15,6 +15,7 @@ runtime AST 为查询引擎、规则引擎、策略系统、代码生成器和�
 - **编译期提取**：由 FIR 解析符号、重载、receiver 和类型信息。
 - **封闭运行时模型**：`ExprNode` 是 `sealed interface`，节点是不可变数据类。
 - **正确处理捕获**：闭包值按稳定的声明身份绑定。
+- **DSL lambda 捕获**：带标记的函数参数接收可调用且携带表达式树的 lambda。
 - **可移植 runtime**：消费方直接使用带源码信息的 Kotlin 模型对象。
 - **锁定 Kotlin 2.4.0**：首版只支持一条 K2 编译器版本线，保证行为可复现。
 
@@ -71,6 +72,33 @@ fun nodeName(node: ExprNode): String = when (node) {
     is UnsupportedExpr -> "recovery"
 }
 ```
+
+## 直接捕获 DSL Lambda
+
+框架 API 在 lambda 参数上标记 `@ExprCapture`。编译器会在对应调用点提供一个可调用的
+lambda，并将生成的 `CapturedExpr` 与它关联。
+
+```kotlin
+fun <T> Query<T>.filter(@ExprCapture predicate: (T) -> Boolean): Query<T> {
+    val captured = requireNotNull(predicate.capturedExprOrNull())
+    return append(FilterStep(captured, predicate))
+}
+
+fun <T, R> Query<T>.map(@ExprCapture transform: (T) -> R): Query<R> {
+    val captured = requireNotNull(transform.capturedExprOrNull())
+    return append(MapStep(captured, transform))
+}
+```
+
+业务代码保持原生 Kotlin DSL：
+
+```kotlin
+query<User>()
+    .filter { it.age >= minimumAge }
+    .map { "${it.name}-$prefix" }
+```
+
+链上的每一步分别持有自己的 AST 和闭包捕获值，同时函数对象仍可直接用于内存执行。
 
 ## 接入方式
 
@@ -134,7 +162,7 @@ Maven 集成以 Kotlin Maven extension `expr-tree-maven-plugin` 注册：
 
 ### 本地开发
 
-仓库内的 `example` 模块会直接加载 compiler-plugin JAR，提供可直接运行的本地接入环境：
+仓库内的 `example` 模块通过本地 included build 应用 Gradle 插件，提供可直接运行的接入环境：
 
 ```powershell
 .\gradlew.bat :example:test --no-daemon --rerun-tasks

@@ -1,6 +1,6 @@
 package com.kotlinorm.experimental.exprtree.api
 
-@Target(AnnotationTarget.FUNCTION)
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.VALUE_PARAMETER)
 @Retention(AnnotationRetention.BINARY)
 annotation class ExprCapture
 
@@ -63,6 +63,25 @@ data class CapturedExpr<T, R>(
         return result
     }
 }
+
+/**
+ * A function value that preserves ordinary Kotlin invocation while carrying
+ * the expression tree generated for its source lambda.
+ */
+interface ExprTreeCarrier<T, R> {
+    val capturedExpr: CapturedExpr<T, R>
+}
+
+class CapturedLambda<T, R>(
+    private val delegate: (T) -> R,
+    override val capturedExpr: CapturedExpr<T, R>,
+) : (T) -> R, ExprTreeCarrier<T, R> {
+    override fun invoke(value: T): R = delegate(value)
+}
+
+@Suppress("UNCHECKED_CAST")
+fun <T, R> ((T) -> R).capturedExprOrNull(): CapturedExpr<T, R>? =
+    (this as? ExprTreeCarrier<T, R>)?.capturedExpr
 
 /** Process-local registry used by generated factories and test fixtures. */
 object ExprTreeRegistry {

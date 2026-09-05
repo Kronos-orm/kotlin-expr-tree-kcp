@@ -16,6 +16,7 @@ evaluators, code generators, and other Kotlin-native expression consumers.
 - **Compile-time extraction**: FIR resolves symbols, overloads, receivers, and types.
 - **Closed runtime model**: `ExprNode` is a `sealed interface` with immutable data nodes.
 - **Correct captures**: closure values are bound by stable declaration identity.
+- **DSL-ready lambdas**: annotated function parameters receive callable lambdas with generated trees.
 - **Portable runtime**: runtime consumers receive plain Kotlin model objects with source information.
 - **Kotlin 2.4.0 baseline**: the initial plugin targets one K2 compiler line for predictable behavior.
 
@@ -77,6 +78,35 @@ fun render(node: ExprNode): String = when (node) {
     is UnsupportedExpr -> "recovery: ${node.reason}"
 }
 ```
+
+## Direct DSL Capture
+
+Framework APIs mark lambda parameters with `@ExprCapture`. At annotated call
+sites, the plugin supplies a callable lambda that also carries its generated
+`CapturedExpr`.
+
+```kotlin
+fun <T> Query<T>.filter(@ExprCapture predicate: (T) -> Boolean): Query<T> {
+    val captured = requireNotNull(predicate.capturedExprOrNull())
+    return append(FilterStep(captured, predicate))
+}
+
+fun <T, R> Query<T>.map(@ExprCapture transform: (T) -> R): Query<R> {
+    val captured = requireNotNull(transform.capturedExprOrNull())
+    return append(MapStep(captured, transform))
+}
+```
+
+Consumers keep the DSL entirely Kotlin-native:
+
+```kotlin
+query<User>()
+    .filter { it.age >= minimumAge }
+    .map { "${it.name}-$prefix" }
+```
+
+Each chain step receives its own tree and lexical capture bindings, while the
+original function value remains callable for in-memory execution.
 
 ## Integration
 
