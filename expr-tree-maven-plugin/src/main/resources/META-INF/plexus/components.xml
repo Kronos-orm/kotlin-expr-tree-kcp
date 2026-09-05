@@ -1,0 +1,10 @@
+<component-set>
+    <components>
+        <component>
+            <role>org.jetbrains.kotlin.maven.KotlinMavenPluginExtension</role>
+            <role-hint>expr-tree-maven-plugin</role-hint>
+            <implementation>com.kotlinorm.experimental.exprtree.maven.ExprTreeMavenPlugin</implementation>
+            <configuration/>
+        </component>
+    </components>
+</component-set>
