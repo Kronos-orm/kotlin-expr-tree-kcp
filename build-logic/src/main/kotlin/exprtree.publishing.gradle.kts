@@ -50,7 +50,8 @@ configure<MavenPublishBaseExtension> {
         signAllPublications()
     }
 
-    publishToMavenCentral()
+    // Release non-SNAPSHOT deployments automatically after Central validation.
+    publishToMavenCentral(true)
 }
 
 tasks.withType<Sign>().configureEach {
