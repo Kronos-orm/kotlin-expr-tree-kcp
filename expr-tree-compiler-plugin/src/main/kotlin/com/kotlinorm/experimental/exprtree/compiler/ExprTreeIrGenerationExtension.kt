@@ -4,6 +4,7 @@ import com.kotlinorm.experimental.exprtree.api.BinaryExpr
 import com.kotlinorm.experimental.exprtree.api.BlockExpr
 import com.kotlinorm.experimental.exprtree.api.AssignmentExpr
 import com.kotlinorm.experimental.exprtree.api.CallExpr
+import com.kotlinorm.experimental.exprtree.api.CatchExpr
 import com.kotlinorm.experimental.exprtree.api.CallableKind
 import com.kotlinorm.experimental.exprtree.api.ConstExpr
 import com.kotlinorm.experimental.exprtree.api.ElvisExpr
@@ -19,6 +20,7 @@ import com.kotlinorm.experimental.exprtree.api.SafeCallExpr
 import com.kotlinorm.experimental.exprtree.api.StringTemplateExpr
 import com.kotlinorm.experimental.exprtree.api.StringTemplatePart
 import com.kotlinorm.experimental.exprtree.api.TypeOperatorExpr
+import com.kotlinorm.experimental.exprtree.api.TryExpr
 import com.kotlinorm.experimental.exprtree.api.UnaryExpr
 import com.kotlinorm.experimental.exprtree.api.UnsupportedExpr
 import com.kotlinorm.experimental.exprtree.api.WhenEntryExpr
@@ -85,13 +87,14 @@ internal class ExprTreeIrGenerationExtension : IrGenerationExtension {
                 val emitter = ExprTreeIrEmitter(pluginContext, builder, currentFile)
                 if (expression.symbol.owner.fqNameWhenAvailable?.asString() == MARKER_FQ_NAME) {
                     val lambda = expression.arguments.getOrNull(0) as? IrFunctionExpression ?: return expression
-                    val tree = ExprCaptureRegistry.treeForLambdaAt(lambda.startOffset) ?: return expression
+                    val tree = ExprCaptureRegistry.takeTreeForLambdaAt(currentFile?.fileEntry?.name.orEmpty(), lambda.startOffset)
+                        ?: return expression
                     return emitter.captured(tree, captureValues(lambda))
                 }
                 expression.arguments.forEachIndexed { index, argument ->
                     val lambda = argument as? IrFunctionExpression
                         ?: return@forEachIndexed
-                    val tree = ExprCaptureRegistry.treeForLambdaAt(lambda.startOffset)
+                    val tree = ExprCaptureRegistry.takeTreeForLambdaAt(currentFile?.fileEntry?.name.orEmpty(), lambda.startOffset)
                         ?: return@forEachIndexed
                     expression.arguments[index] = emitter.capturedLambda(
                         lambda,
@@ -226,6 +229,8 @@ private class ExprTreeIrEmitter(
         is LocalDeclarationExpr -> new("com.kotlinorm.experimental.exprtree.api.LocalDeclarationExpr", exprId(value.id.value), type(value.type), local(value.declaration), value.initializer?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprNode"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is AssignmentExpr -> new("com.kotlinorm.experimental.exprtree.api.AssignmentExpr", exprId(value.id.value), type(value.type), node(value.target), node(value.value), enum("com.kotlinorm.experimental.exprtree.api.AssignmentOperator", value.operator.name), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is IfExpr -> new("com.kotlinorm.experimental.exprtree.api.IfExpr", exprId(value.id.value), type(value.type), node(value.condition), node(value.thenBranch), value.elseBranch?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprNode"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
+        is TryExpr -> new("com.kotlinorm.experimental.exprtree.api.TryExpr", exprId(value.id.value), type(value.type), node(value.tryBlock), list("com.kotlinorm.experimental.exprtree.api.CatchExpr", value.catches.map(::node)), value.finallyBlock?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprNode"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
+        is CatchExpr -> new("com.kotlinorm.experimental.exprtree.api.CatchExpr", exprId(value.id.value), type(value.type), local(value.parameter), node(value.body), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is WhenEntryExpr -> new("com.kotlinorm.experimental.exprtree.api.WhenEntryExpr", exprId(value.id.value), type(value.type), list("com.kotlinorm.experimental.exprtree.api.ExprNode", value.conditions.map(::node)), node(value.body), builder.irBoolean(value.isElse), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is WhenExpr -> new("com.kotlinorm.experimental.exprtree.api.WhenExpr", exprId(value.id.value), type(value.type), value.subject?.let(::whenSubject) ?: nullOf("com.kotlinorm.experimental.exprtree.api.WhenSubject"), list("com.kotlinorm.experimental.exprtree.api.WhenEntryExpr", value.entries.map(::node)), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is StringTemplateExpr -> new("com.kotlinorm.experimental.exprtree.api.StringTemplateExpr", exprId(value.id.value), type(value.type), list("com.kotlinorm.experimental.exprtree.api.StringTemplatePart", value.parts.map(::stringPart)), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))

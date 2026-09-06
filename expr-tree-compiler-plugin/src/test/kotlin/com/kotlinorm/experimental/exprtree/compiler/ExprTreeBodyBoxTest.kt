@@ -11,4 +11,7 @@ class ExprTreeBodyBoxTest : AbstractExprTreeJvmBoxSuite("body") {
 
     @Test
     fun branchBoundaries() = box("branchBoundaries")
+
+    @Test
+    fun tryCatchFinally() = box("tryCatchFinally")
 }

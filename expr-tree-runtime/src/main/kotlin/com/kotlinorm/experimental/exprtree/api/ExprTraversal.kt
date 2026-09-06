@@ -28,6 +28,8 @@ fun ExprNode.children(): List<ExprNode> = when (this) {
     is LocalDeclarationExpr -> listOfNotNull(initializer)
     is AssignmentExpr -> listOf(target, value)
     is IfExpr -> listOfNotNull(condition, thenBranch, elseBranch)
+    is TryExpr -> listOf(tryBlock) + catches + listOfNotNull(finallyBlock)
+    is CatchExpr -> listOf(body)
     is WhenEntryExpr -> conditions + body
     is WhenExpr -> listOfNotNull(subject?.initializer) + entries
     is StringTemplateExpr -> parts.mapNotNull { (it as? StringTemplatePart.Expression)?.expression }
@@ -53,6 +55,12 @@ fun <C> ExprNode.transformChildren(transformer: ExprTransformer<C>, context: C):
         is LocalDeclarationExpr -> copy(initializer = initializer?.let(::t))
         is AssignmentExpr -> copy(target = t(target), value = t(value))
         is IfExpr -> copy(condition = t(condition), thenBranch = t(thenBranch), elseBranch = elseBranch?.let(::t))
+        is TryExpr -> copy(
+            tryBlock = t(tryBlock),
+            catches = catches.map { t(it) as CatchExpr },
+            finallyBlock = finallyBlock?.let(::t),
+        )
+        is CatchExpr -> copy(body = t(body))
         is WhenEntryExpr -> copy(conditions = conditions.map(::t), body = t(body))
         is WhenExpr -> copy(
             subject = subject?.copy(initializer = t(subject.initializer)),
@@ -167,6 +175,8 @@ fun ExprTree<*, *>.debugString(): String = buildString {
             is AssignmentExpr -> append(" ").append(node.operator)
             is LocalDeclarationExpr -> append(" ").append(if (node.declaration.mutable) "var " else "val ").append(node.declaration.name)
             is IfExpr -> append(" if")
+            is TryExpr -> append(" try")
+            is CatchExpr -> append(" catch ").append(node.parameter.name)
             is WhenExpr -> append(" when").append(if (node.subject == null) "" else " subject=" + node.subject.declaration.name)
             is WhenEntryExpr -> append(if (node.isElse) " else" else " entry")
             is StringTemplateExpr -> append(" parts=").append(node.parts.size)

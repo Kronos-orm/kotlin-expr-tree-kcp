@@ -202,6 +202,27 @@ data class IfExpr(
     override val origin: OriginRef? = null,
 ) : ExprNode
 
+/** A Kotlin `try` expression with zero or more catches and an optional `finally` block. */
+data class TryExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val tryBlock: ExprNode,
+    val catches: List<CatchExpr>,
+    val finallyBlock: ExprNode? = null,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+/** A `catch` clause within a [TryExpr]. */
+data class CatchExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val parameter: LocalDecl,
+    val body: ExprNode,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
 /** A single branch in a [WhenExpr]. Conditions are empty only for an `else` branch. */
 data class WhenEntryExpr(
     override val id: ExprId,

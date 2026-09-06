@@ -78,15 +78,20 @@ class ExprTreeTest {
             LocalDeclarationExpr(ExprId(12), TypeRef("kotlin.Int"), LocalDecl(DeclId(12), "local", TypeRef("kotlin.Int")), leaf),
             AssignmentExpr(ExprId(13), TypeRef("kotlin.Unit"), RefExpr(ExprId(14), TypeRef("kotlin.Int"), DeclId(12), "local", RefKind.LOCAL), leaf),
             IfExpr(ExprId(15), TypeRef("kotlin.Int"), leaf, leaf, leaf),
-            WhenEntryExpr(ExprId(16), TypeRef("kotlin.Int"), listOf(leaf), leaf),
-            WhenExpr(
-                ExprId(17),
-                TypeRef("kotlin.Int"),
-                WhenSubject(LocalDecl(DeclId(17), "whenSubject", TypeRef("kotlin.Int")), leaf),
-                listOf(WhenEntryExpr(ExprId(18), TypeRef("kotlin.Int"), emptyList(), leaf, isElse = true)),
+            TryExpr(
+                ExprId(16), TypeRef("kotlin.Int"), leaf,
+                listOf(CatchExpr(ExprId(17), TypeRef("kotlin.Int"), LocalDecl(DeclId(17), "failure", TypeRef("kotlin.Throwable")), leaf)),
+                leaf,
             ),
-            StringTemplateExpr(ExprId(19), TypeRef("kotlin.String"), listOf(StringTemplatePart.Text("value="), StringTemplatePart.Expression(leaf))),
-            TypeOperatorExpr(ExprId(20), TypeRef("kotlin.Boolean"), TypeOperator.IS, leaf, TypeRef("kotlin.String")),
+            WhenEntryExpr(ExprId(18), TypeRef("kotlin.Int"), listOf(leaf), leaf),
+            WhenExpr(
+                ExprId(19),
+                TypeRef("kotlin.Int"),
+                WhenSubject(LocalDecl(DeclId(19), "whenSubject", TypeRef("kotlin.Int")), leaf),
+                listOf(WhenEntryExpr(ExprId(20), TypeRef("kotlin.Int"), emptyList(), leaf, isElse = true)),
+            ),
+            StringTemplateExpr(ExprId(21), TypeRef("kotlin.String"), listOf(StringTemplatePart.Text("value="), StringTemplatePart.Expression(leaf))),
+            TypeOperatorExpr(ExprId(22), TypeRef("kotlin.Boolean"), TypeOperator.IS, leaf, TypeRef("kotlin.String")),
         )
         val root = BlockExpr(ExprId(99), TypeRef("kotlin.Int"), nodes)
         val visited = root.collect()
@@ -104,6 +109,8 @@ class ExprTreeTest {
         assertTrue(debug.contains("LocalDeclarationExpr"))
         assertTrue(debug.contains("AssignmentExpr"))
         assertTrue(debug.contains("IfExpr"))
+        assertTrue(debug.contains("TryExpr"))
+        assertTrue(debug.contains("CatchExpr"))
         assertTrue(debug.contains("WhenExpr"))
         assertTrue(debug.contains("StringTemplateExpr"))
         assertTrue(debug.contains("TypeOperatorExpr"))

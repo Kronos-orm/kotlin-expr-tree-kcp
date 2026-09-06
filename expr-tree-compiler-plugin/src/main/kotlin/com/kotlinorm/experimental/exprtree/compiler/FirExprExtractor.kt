@@ -5,6 +5,7 @@ import com.kotlinorm.experimental.exprtree.api.BlockExpr
 import com.kotlinorm.experimental.exprtree.api.AssignmentExpr
 import com.kotlinorm.experimental.exprtree.api.AssignmentOperator
 import com.kotlinorm.experimental.exprtree.api.CallExpr
+import com.kotlinorm.experimental.exprtree.api.CatchExpr
 import com.kotlinorm.experimental.exprtree.api.CallableKind
 import com.kotlinorm.experimental.exprtree.api.CallableRef
 import com.kotlinorm.experimental.exprtree.api.CaptureDecl
@@ -28,6 +29,7 @@ import com.kotlinorm.experimental.exprtree.api.SafeCallExpr
 import com.kotlinorm.experimental.exprtree.api.SourceSpan
 import com.kotlinorm.experimental.exprtree.api.TreeMetadata
 import com.kotlinorm.experimental.exprtree.api.TypeRef
+import com.kotlinorm.experimental.exprtree.api.TryExpr
 import com.kotlinorm.experimental.exprtree.api.TypeOperator
 import com.kotlinorm.experimental.exprtree.api.TypeOperatorExpr
 import com.kotlinorm.experimental.exprtree.api.UnaryExpr
@@ -44,6 +46,7 @@ import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.expressions.FirAnonymousFunctionExpression
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirBooleanOperatorExpression
+import org.jetbrains.kotlin.fir.expressions.FirCatch
 import org.jetbrains.kotlin.fir.expressions.FirComparisonExpression
 import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirCheckedSafeCallSubject
@@ -58,6 +61,7 @@ import org.jetbrains.kotlin.fir.expressions.FirSafeCallExpression
 import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.expressions.FirStringConcatenationCall
 import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression
+import org.jetbrains.kotlin.fir.expressions.FirTryExpression
 import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment
 import org.jetbrains.kotlin.fir.expressions.FirWhenBranch
@@ -152,6 +156,7 @@ internal class FirExprExtractor private constructor(
         is FirFunctionCall -> call(expression)
         is FirSafeCallExpression -> safeCall(expression)
         is FirElvisExpression -> ElvisExpr(id(), typeOf(expression), extract(expression.lhs), extract(expression.rhs), span(expression))
+        is FirTryExpression -> tryExpression(expression)
         is FirWhenExpression -> whenExpression(expression)
         is FirStringConcatenationCall -> stringTemplate(expression)
         is FirTypeOperatorCall -> typeOperator(expression)
@@ -214,6 +219,37 @@ internal class FirExprExtractor private constructor(
             subject?.let { scoped ->
                 if (scoped.previous == null) locals.remove(scoped.symbol) else locals[scoped.symbol] = scoped.previous
             }
+        }
+    }
+
+    private fun tryExpression(expression: FirTryExpression): ExprNode = TryExpr(
+        id = id(),
+        type = typeOf(expression),
+        tryBlock = lambdaBody(expression.tryBlock),
+        catches = expression.catches.map(::catchClause),
+        finallyBlock = expression.finallyBlock?.let(::lambdaBody),
+        source = span(expression),
+    )
+
+    private fun catchClause(catch: org.jetbrains.kotlin.fir.expressions.FirCatch): CatchExpr {
+        val parameter = catch.parameter
+        val declaration = LocalDecl(
+            id = ids.declaration(),
+            name = parameter.name.asString(),
+            type = typeOf(parameter.returnTypeRef),
+            mutable = parameter.isVar,
+        )
+        val previous = locals.put(parameter.symbol, declaration)
+        return try {
+            CatchExpr(
+                id = id(),
+                type = typeOf(catch.block),
+                parameter = declaration,
+                body = lambdaBody(catch.block),
+                source = span(catch),
+            )
+        } finally {
+            if (previous == null) locals.remove(parameter.symbol) else locals[parameter.symbol] = previous
         }
     }
 
@@ -440,6 +476,7 @@ internal class FirExprExtractor private constructor(
         when (element) {
             is FirStatement -> element.source
             is FirDeclaration -> element.source
+            is FirCatch -> element.source
             is FirWhenBranch -> element.source
             else -> null
         }

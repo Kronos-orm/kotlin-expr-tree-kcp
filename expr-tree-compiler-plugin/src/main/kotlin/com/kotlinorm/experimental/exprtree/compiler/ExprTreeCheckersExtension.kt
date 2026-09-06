@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import com.kotlinorm.experimental.exprtree.api.ExprTree
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
-import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentHashMap
 
 class ExprTreeCheckersExtension(session: FirSession) : FirAdditionalCheckersExtension(session) {
     override val expressionCheckers: ExpressionCheckers = object : ExpressionCheckers() {
@@ -41,6 +41,7 @@ object ExprCaptureCallChecker : FirFunctionCallChecker(MppCheckerKind.Common) {
             if (isMarkerCall || parameterIsCaptured) {
                 CapturedLambdaSummary(
                     argumentIndex = index,
+                    sourceFile = context.containingFile?.path ?: context.containingFile?.name.orEmpty(),
                     lambdaStartOffset = lambda.source?.startOffset ?: -1,
                     tree = FirExprExtractor.fromLambda(lambda),
                 )
@@ -59,6 +60,7 @@ private val EXPR_CAPTURE_ANNOTATION = ClassId.topLevel(FqName("com.kotlinorm.exp
 
 data class CapturedLambdaSummary(
     val argumentIndex: Int,
+    val sourceFile: String,
     val lambdaStartOffset: Int,
     val tree: ExprTree<Any?, Any?>,
 )
@@ -67,21 +69,42 @@ data class CapturedCallSummary(
     val lambdas: List<CapturedLambdaSummary>,
 )
 
-/** Compiler-session collection is deliberately internal and contains no FIR nodes. */
+/**
+ * Bridge data from FIR checking to IR generation without retaining compiler nodes.
+ * A lambda is consumed once by its source file and offset, so separate compiler
+ * modules cannot accidentally reuse a stale tree with the same offset.
+ */
 object ExprCaptureRegistry {
-    /** FIR checkers may run concurrently with other analysis work. */
-    private val capturedCalls = CopyOnWriteArrayList<CapturedCallSummary>()
+    private val trees = ConcurrentHashMap<CaptureKey, ExprTree<Any?, Any?>>()
 
     fun record(summary: CapturedCallSummary) {
-        capturedCalls += summary
+        summary.lambdas.forEach { lambda ->
+            trees[key(lambda.sourceFile, lambda.lambdaStartOffset)] = lambda.tree
+        }
     }
 
-    internal fun clear() = capturedCalls.clear()
-    internal fun snapshot(): List<CapturedCallSummary> = capturedCalls.toList()
+    internal fun clear() = trees.clear()
+    internal fun snapshot(): List<ExprTree<Any?, Any?>> = trees.values.toList()
 
-    internal fun treeForLambdaAt(startOffset: Int): ExprTree<Any?, Any?>? =
-        capturedCalls.toList().asReversed().asSequence()
-            .flatMap { it.lambdas.asReversed().asSequence() }
-            .firstOrNull { it.lambdaStartOffset == startOffset }
-            ?.tree
+    internal fun treeForLambdaAt(sourceFile: String, startOffset: Int): ExprTree<Any?, Any?>? =
+        trees[key(sourceFile, startOffset)]
+
+    internal fun takeTreeForLambdaAt(sourceFile: String, startOffset: Int): ExprTree<Any?, Any?>? =
+        trees.remove(key(sourceFile, startOffset)) ?: run {
+            // FIR and IR can spell the same source path differently in compiler tests.
+            // Match the filename only when that source location is unambiguous.
+            val sourceName = sourceFile.replace('\\', '/').substringAfterLast('/')
+            val candidates = trees.entries.filter { candidate ->
+                candidate.key.startOffset == startOffset &&
+                    candidate.key.sourceFile.substringAfterLast('/') == sourceName
+            }
+            if (candidates.size == 1) trees.remove(candidates.single().key) else null
+        }
+
+    private fun key(sourceFile: String, startOffset: Int): CaptureKey = CaptureKey(
+        sourceFile.replace('\\', '/'),
+        startOffset,
+    )
+
+    private data class CaptureKey(val sourceFile: String, val startOffset: Int)
 }

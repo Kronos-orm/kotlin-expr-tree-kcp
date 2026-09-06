@@ -202,7 +202,7 @@ The compiler-plugin test fixtures cover literals, parameter, local-variable,
 and captured-value references; property access; function and operator calls;
 boolean logic; comparisons; equality checks; safe calls; Elvis expressions;
 blocks; nested lambdas; local declarations; assignments; expression-valued
-`if`; subjectless and subject-style `when`; string templates;
+`if`; `try` expressions with catch clauses and finally blocks; subjectless and subject-style `when`; string templates;
 `is`/`!is`/`as`/`as?`; source spans; and shadowing. A subject-style
 `when (value)` is represented by a `WhenSubject` that stores the initializer
 once and provides a stable local declaration for branch conditions.

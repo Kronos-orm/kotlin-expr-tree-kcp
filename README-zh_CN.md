@@ -192,7 +192,7 @@ Maven 集成通过 Kotlin Maven 编译器插件扩展 `expr-tree-maven-plugin` �
 编译器插件的测试样例（test fixtures）覆盖字面量、参数引用、局部变量引用、捕获值引用、属性访问、
 函数和操作符调用、布尔逻辑、比较、相等判断、安全调用（safe call）、Elvis 表达式、
 代码块（block）、嵌套 Lambda、局部声明、赋值、表达式形式的 `if`、无 subject 和有
-subject 的 `when`、字符串模板、`is`/`!is`/`as`/`as?`、源码区间和名称遮蔽（shadowing）。
+subject 的 `when`、带 catch 子句和 finally 块的 `try` 表达式、字符串模板、`is`/`!is`/`as`/`as?`、源码区间和名称遮蔽（shadowing）。
 
 `when (value) { ... }` 会表示为 `WhenSubject`：树中保存一份 initializer，并提供稳定的局部
 声明供分支条件引用。
