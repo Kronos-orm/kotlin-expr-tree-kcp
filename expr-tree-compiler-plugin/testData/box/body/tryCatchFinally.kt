@@ -18,6 +18,22 @@ fun captureTryCatchFinally(limit: Int, suffix: String) = expr<Int, String> { val
     }
 }
 
+fun captureTryCatchOnly(suffix: String) = expr<String, String> { value ->
+    try {
+        if (value.isNotEmpty()) value else throw IllegalArgumentException(suffix)
+    } catch (failure: IllegalArgumentException) {
+        failure.message ?: suffix
+    }
+}
+
+fun captureTryFinallyOnly(prefix: String) = expr<Int, String> { value ->
+    try {
+        "$prefix:$value"
+    } finally {
+        require(value >= 0)
+    }
+}
+
 fun box(): String {
     val captured = captureTryCatchFinally(2, "total")
     check(captured.tree.captures.map { it.name } == listOf("limit", "suffix"))
@@ -33,5 +49,13 @@ fun box(): String {
     check(nodes.count { it is CatchExpr } == 2)
     check(nodes.any { it is LocalDeclarationExpr })
     check(nodes.any { it is IfExpr })
+
+    val catchOnly = captureTryCatchOnly("empty").tree.body as? TryExpr ?: error("missing catch-only try")
+    check(catchOnly.catches.size == 1)
+    check(catchOnly.finallyBlock == null)
+
+    val finallyOnly = captureTryFinallyOnly("value").tree.body as? TryExpr ?: error("missing finally-only try")
+    check(finallyOnly.catches.isEmpty())
+    check(finallyOnly.finallyBlock != null)
     return "OK"
 }
