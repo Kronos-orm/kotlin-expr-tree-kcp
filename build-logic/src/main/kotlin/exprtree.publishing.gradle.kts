@@ -45,6 +45,11 @@ configure<MavenPublishBaseExtension> {
         }
     }
 
+    // Maven Central requires every published file, including Gradle plugin markers, to be signed.
+    if (!project.version.toString().endsWith("-SNAPSHOT")) {
+        signAllPublications()
+    }
+
     publishToMavenCentral()
 }
 
