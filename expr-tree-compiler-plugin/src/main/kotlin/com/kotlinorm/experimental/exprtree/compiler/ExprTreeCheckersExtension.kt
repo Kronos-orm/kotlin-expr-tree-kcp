@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import com.kotlinorm.experimental.exprtree.api.ExprTree
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
+import java.util.concurrent.CopyOnWriteArrayList
 
 class ExprTreeCheckersExtension(session: FirSession) : FirAdditionalCheckersExtension(session) {
     override val expressionCheckers: ExpressionCheckers = object : ExpressionCheckers() {
@@ -68,7 +69,8 @@ data class CapturedCallSummary(
 
 /** Compiler-session collection is deliberately internal and contains no FIR nodes. */
 object ExprCaptureRegistry {
-    private val capturedCalls = mutableListOf<CapturedCallSummary>()
+    /** FIR checkers may run concurrently with other analysis work. */
+    private val capturedCalls = CopyOnWriteArrayList<CapturedCallSummary>()
 
     fun record(summary: CapturedCallSummary) {
         capturedCalls += summary
@@ -78,7 +80,7 @@ object ExprCaptureRegistry {
     internal fun snapshot(): List<CapturedCallSummary> = capturedCalls.toList()
 
     internal fun treeForLambdaAt(startOffset: Int): ExprTree<Any?, Any?>? =
-        capturedCalls.asReversed().asSequence()
+        capturedCalls.toList().asReversed().asSequence()
             .flatMap { it.lambdas.asReversed().asSequence() }
             .firstOrNull { it.lambdaStartOffset == startOffset }
             ?.tree
