@@ -3,7 +3,10 @@
 [![Kotlin](https://img.shields.io/badge/kotlin-2.4.0-%237f52ff.svg?logo=kotlin)](https://kotlinlang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/ci.yml)
-[![Coverage](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/raw/coverage/coverage-compiler-plugin.svg)](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/coverage.yml)
+[![Compiler Line Coverage](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/raw/coverage/coverage-compiler-plugin.svg)](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/coverage.yml)
+[![Compiler Branch Coverage](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/raw/coverage/coverage-compiler-plugin-branch.svg)](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/coverage.yml)
+[![Runtime Line Coverage](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/raw/coverage/coverage-runtime.svg)](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/coverage.yml)
+[![Runtime Branch Coverage](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/raw/coverage/coverage-runtime-branch.svg)](https://github.com/Kronos-orm/kotlin-expr-tree-kcp/actions/workflows/coverage.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/com.kotlinorm.experimental/expr-tree-runtime.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.kotlinorm.experimental/expr-tree-runtime)
 
 English | [简体中文](README-zh_CN.md)

@@ -55,7 +55,7 @@ jobs:
           echo "runtime_line=$(read_coverage expr-tree-runtime/build/reports/kover/report.xml LINE)" >> "$GITHUB_OUTPUT"
           echo "runtime_branch=$(read_coverage expr-tree-runtime/build/reports/kover/report.xml BRANCH)" >> "$GITHUB_OUTPUT"
           mkdir -p coverage
-      - name: Generate compiler coverage badge
+      - name: Generate compiler line coverage badge
         if: github.event_name != 'pull_request'
         uses: emibcn/badge-action@v2.0.3
         with:
@@ -63,7 +63,15 @@ jobs:
           status: ${{ steps.values.outputs.compiler_line }}%
           color: brightgreen
           path: coverage/coverage-compiler-plugin.svg
-      - name: Generate runtime coverage badge
+      - name: Generate compiler branch coverage badge
+        if: github.event_name != 'pull_request'
+        uses: emibcn/badge-action@v2.0.3
+        with:
+          label: compiler branch coverage
+          status: ${{ steps.values.outputs.compiler_branch }}%
+          color: brightgreen
+          path: coverage/coverage-compiler-plugin-branch.svg
+      - name: Generate runtime line coverage badge
         if: github.event_name != 'pull_request'
         uses: emibcn/badge-action@v2.0.3
         with:
@@ -71,6 +79,14 @@ jobs:
           status: ${{ steps.values.outputs.runtime_line }}%
           color: brightgreen
           path: coverage/coverage-runtime.svg
+      - name: Generate runtime branch coverage badge
+        if: github.event_name != 'pull_request'
+        uses: emibcn/badge-action@v2.0.3
+        with:
+          label: runtime branch coverage
+          status: ${{ steps.values.outputs.runtime_branch }}%
+          color: brightgreen
+          path: coverage/coverage-runtime-branch.svg
       - name: Publish coverage badges
         if: github.event_name != 'pull_request'
         uses: JamesIves/github-pages-deploy-action@v4
