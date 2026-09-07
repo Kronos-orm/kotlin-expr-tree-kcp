@@ -5,7 +5,7 @@ import com.kotlinorm.experimental.exprtree.api.ElvisExpr
 import com.kotlinorm.experimental.exprtree.api.ExprNode
 import com.kotlinorm.experimental.exprtree.api.IfExpr
 import com.kotlinorm.experimental.exprtree.api.LambdaExpr
-import com.kotlinorm.experimental.exprtree.api.PropertyGetExpr
+import com.kotlinorm.experimental.exprtree.api.PropertyAccessExpr
 import com.kotlinorm.experimental.exprtree.api.RefExpr
 import com.kotlinorm.experimental.exprtree.api.SafeCallExpr
 import com.kotlinorm.experimental.exprtree.api.TypeOperator
@@ -48,7 +48,7 @@ fun box(): String {
     check(trees.flatten().any { it is BinaryExpr })
     check(trees.flatten().any { it is UnaryExpr })
     check(trees.flatten().any { it is CallExpr })
-    check(trees.flatten().any { it is PropertyGetExpr })
+    check(trees.flatten().any { it is PropertyAccessExpr })
     check(trees.flatten().any { it is ElvisExpr })
     check(trees.flatten().any { it is SafeCallExpr })
     check(trees.flatten().any { it is TypeOperatorExpr && it.operator == TypeOperator.IS })

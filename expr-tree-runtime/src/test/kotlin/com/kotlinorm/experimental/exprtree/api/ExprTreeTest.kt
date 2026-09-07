@@ -11,7 +11,7 @@ class ExprTreeTest {
     fun `generic model preserves a resolved binary predicate`() {
         val user = ParameterDecl(DeclId(1), "user", TypeRef("example.User"))
         val minimum = CaptureDecl(DeclId(2), "minimum", TypeRef("kotlin.Int"))
-        val age = PropertyGetExpr(
+        val age = PropertyAccessExpr(
             id = ExprId(3),
             type = TypeRef("kotlin.Int", Nullability.NON_NULL),
             property = CallableRef("example.User.age"),
@@ -66,10 +66,18 @@ class ExprTreeTest {
         val nodes: List<ExprNode> = listOf(
             leaf,
             RefExpr(ExprId(2), TypeRef("kotlin.Int"), DeclId(1), "x", RefKind.LOCAL),
-            PropertyGetExpr(ExprId(3), TypeRef("kotlin.Int"), CallableRef("p"), leaf),
+            PropertyAccessExpr(ExprId(3), TypeRef("kotlin.Int"), CallableRef("p"), leaf),
+            IndexAccessExpr(ExprId(28), TypeRef("kotlin.Int"), CallableRef("example.get"), leaf, listOf(leaf, leaf)),
+            IndexAccessExpr(ExprId(30), TypeRef("kotlin.Unit"), CallableRef("example.set"), leaf, listOf(leaf, leaf), IndexAccessOperation.SET, leaf),
+            PropertyAccessExpr(ExprId(29), TypeRef("kotlin.Unit"), CallableRef("example.set"), leaf, PropertyAccessOperation.SET, leaf),
             CallExpr(ExprId(4), TypeRef("kotlin.Int"), CallableRef("f"), leaf, null, listOf(leaf)),
             UnaryExpr(ExprId(5), TypeRef("kotlin.Int"), CallableRef("neg"), leaf),
             BinaryExpr(ExprId(6), TypeRef("kotlin.Int"), CallableRef("plus"), leaf, leaf),
+            RangeExpr(ExprId(23), TypeRef("kotlin.IntRange"), leaf, leaf, RangeOperation.RANGE_TO, CallableRef("kotlin.Int.rangeTo", isOperator = true)),
+            IncDecExpr(ExprId(24), TypeRef("kotlin.Int"), leaf, IncDecOperation.INC, CallableRef("kotlin.Int.inc", isOperator = true), prefix = false),
+            CallableReferenceExpr(ExprId(25), TypeRef("kotlin.Function1"), CallableRef("example.f")),
+            RefExpr(ExprId(26), TypeRef("example.Base"), null, "super", RefKind.SUPER, label = "Outer", qualifierType = TypeRef("example.Base")),
+            SmartCastExpr(ExprId(27), TypeRef("kotlin.String"), leaf, TypeRef("kotlin.String", Nullability.NON_NULL)),
             SafeCallExpr(ExprId(7), TypeRef("kotlin.Int"), leaf, leaf),
             ElvisExpr(ExprId(8), TypeRef("kotlin.Int"), leaf, leaf),
             BlockExpr(ExprId(9), TypeRef("kotlin.Int"), listOf(leaf)),
@@ -92,6 +100,13 @@ class ExprTreeTest {
             ),
             StringTemplateExpr(ExprId(21), TypeRef("kotlin.String"), listOf(StringTemplatePart.Text("value="), StringTemplatePart.Expression(leaf))),
             TypeOperatorExpr(ExprId(22), TypeRef("kotlin.Boolean"), TypeOperator.IS, leaf, TypeRef("kotlin.String")),
+            ReturnExpr(ExprId(101), TypeRef("kotlin.Nothing"), leaf, targetId = ExprId(99), targetLabel = "exit"),
+            WhileExpr(ExprId(102), TypeRef("kotlin.Unit"), leaf, leaf, ExprId(102), label = "loop"),
+            DoWhileExpr(ExprId(103), TypeRef("kotlin.Unit"), leaf, leaf, ExprId(103), label = "post"),
+            BreakExpr(ExprId(104), TypeRef("kotlin.Nothing"), ExprId(102), "loop"),
+            ContinueExpr(ExprId(105), TypeRef("kotlin.Nothing"), ExprId(103), "post"),
+            ForLoopExpr(ExprId(106), TypeRef("kotlin.Unit"), LocalDecl(DeclId(106), "item", leaf.type), leaf, leaf, ExprId(106), "each"),
+            ThrowExpr(ExprId(107), TypeRef("kotlin.Nothing"), leaf),
         )
         val root = BlockExpr(ExprId(99), TypeRef("kotlin.Int"), nodes)
         val visited = root.collect()
@@ -214,6 +229,60 @@ class ExprTreeTest {
         ).validate()
         assertTrue(diagnostics.any { it.code == "KET100" })
         assertTrue(diagnostics.any { it.code == "KET101" && it.message.contains("when subject") })
+    }
+
+    @Test
+    fun `unsupported nodes retain source text for runtime recovery`() {
+        val node = UnsupportedExpr(
+            id = ExprId(90),
+            type = TypeRef("kotlin.Any"),
+            reason = "future-fir-node",
+            source = SourceSpan("sample.kt", 3, 12),
+            sourceText = "value?.let { it + 1 }",
+        )
+        assertEquals("value?.let { it + 1 }", node.sourceText)
+        assertTrue(ExprTree<Any?, Any?>(parameters = emptyList(), captures = emptyList(), body = node).debugString().contains("source=\"value?.let { it + 1 }\""))
+    }
+
+    @Test
+    fun `receiver references preserve kind labels and super qualifier`() {
+        val thisRef = RefExpr(
+            ExprId(96), TypeRef("example.Outer"), DeclId(7), "this", RefKind.THIS,
+            label = "Outer",
+        )
+        val superRef = RefExpr(
+            ExprId(97), TypeRef("example.Base"), null, "super", RefKind.SUPER,
+            label = "Outer", qualifierType = TypeRef("example.Base"),
+        )
+        assertEquals("Outer", thisRef.label)
+        assertEquals("Outer", superRef.label)
+        assertNull(superRef.declaration)
+        assertEquals("example.Base", superRef.qualifierType?.classifierId)
+        assertTrue(superRef.children().isEmpty())
+    }
+
+    @Test
+    fun `destructuring keeps one node and transforms binding initializers`() {
+        val source = ConstExpr(ExprId(91), TypeRef("example.Pair"), "pair")
+        val first = ConstExpr(ExprId(92), TypeRef("kotlin.Int"), 1)
+        val second = ConstExpr(ExprId(93), TypeRef("kotlin.String"), "x")
+        val destructuring = DestructuringExpr(
+            id = ExprId(94),
+            type = TypeRef("kotlin.Unit"),
+            initializer = source,
+            entries = listOf(
+                DestructuringBinding(LocalDecl(DeclId(91), "first", first.type), first, componentIndex = 1),
+                DestructuringBinding(LocalDecl(DeclId(92), "second", second.type), second, componentIndex = 2),
+            ),
+            mode = DestructuringMode.POSITIONAL,
+        )
+        assertEquals(listOf(source, first, second), destructuring.children())
+        val replacement = ConstExpr(ExprId(95), TypeRef("kotlin.Int"), 2)
+        val transformed = destructuring.transformRecursively(object : ExprTransformer<Unit> {
+            override fun transform(node: ExprNode, context: Unit): ExprNode = if (node == first) replacement else node
+        }, Unit) as DestructuringExpr
+        assertEquals(replacement, transformed.entries.first().initializer)
+        assertEquals(DestructuringMode.POSITIONAL, transformed.mode)
     }
 
     private fun ExprNode.debugTreeForTest(): String = ExprTree<Any?, Any?>(

@@ -75,30 +75,35 @@ data class CapturedCallSummary(
  * modules cannot accidentally reuse a stale tree with the same offset.
  */
 object ExprCaptureRegistry {
-    private val trees = ConcurrentHashMap<CaptureKey, ExprTree<Any?, Any?>>()
+    /** FIR checking and IR generation for one compilation share a thread. */
+    private val trees = ThreadLocal.withInitial {
+        ConcurrentHashMap<CaptureKey, ExprTree<Any?, Any?>>()
+    }
 
     fun record(summary: CapturedCallSummary) {
+        val current = trees.get()
         summary.lambdas.forEach { lambda ->
-            trees[key(lambda.sourceFile, lambda.lambdaStartOffset)] = lambda.tree
+            current[key(lambda.sourceFile, lambda.lambdaStartOffset)] = lambda.tree
         }
     }
 
-    internal fun clear() = trees.clear()
-    internal fun snapshot(): List<ExprTree<Any?, Any?>> = trees.values.toList()
+    internal fun clear() = trees.get().clear()
+    internal fun snapshot(): List<ExprTree<Any?, Any?>> = trees.get().values.toList()
 
     internal fun treeForLambdaAt(sourceFile: String, startOffset: Int): ExprTree<Any?, Any?>? =
-        trees[key(sourceFile, startOffset)]
+        trees.get()[key(sourceFile, startOffset)]
 
     internal fun takeTreeForLambdaAt(sourceFile: String, startOffset: Int): ExprTree<Any?, Any?>? =
-        trees.remove(key(sourceFile, startOffset)) ?: run {
+        trees.get().remove(key(sourceFile, startOffset)) ?: run {
             // FIR and IR can spell the same source path differently in compiler tests.
             // Match the filename only when that source location is unambiguous.
             val sourceName = sourceFile.replace('\\', '/').substringAfterLast('/')
-            val candidates = trees.entries.filter { candidate ->
+            val current = trees.get()
+            val candidates = current.entries.filter { candidate ->
                 candidate.key.startOffset == startOffset &&
                     candidate.key.sourceFile.substringAfterLast('/') == sourceName
             }
-            if (candidates.size == 1) trees.remove(candidates.single().key) else null
+            if (candidates.size == 1) current.remove(candidates.single().key) else null
         }
 
     private fun key(sourceFile: String, startOffset: Int): CaptureKey = CaptureKey(

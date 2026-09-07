@@ -76,7 +76,8 @@ fun render(node: ExprNode): String = when (node) {
     is ConstExpr -> node.value.toString()
     is RefExpr -> node.name
     is BinaryExpr -> "(${render(node.left)} ${node.operator.callableId} ${render(node.right)})"
-    is PropertyGetExpr -> node.property.callableId
+    is PropertyAccessExpr -> node.property.callableId
+    is IndexAccessExpr -> node.callable.callableId
     is CallExpr -> node.callable.callableId
     is UnaryExpr -> node.operator.callableId
     is SafeCallExpr -> render(node.receiver) + "?."
@@ -86,6 +87,20 @@ fun render(node: ExprNode): String = when (node) {
     is LocalDeclarationExpr -> node.declaration.name
     is AssignmentExpr -> node.operator.name
     is IfExpr -> "if (...)"
+    is ReturnExpr -> "return ${render(node.value)}"
+    is WhileExpr -> "while (...)"
+    is DoWhileExpr -> "do ... while (...)"
+    is BreakExpr -> "break"
+    is ContinueExpr -> "continue"
+    is ForLoopExpr -> "for (${node.declaration.name} in ${render(node.iterable)})"
+    is ThrowExpr -> "throw ${render(node.value)}"
+    is DestructuringExpr -> node.entries.joinToString(", ") { it.declaration.name }
+    is RangeExpr -> "${render(node.start)}..${render(node.end)}"
+    is IncDecExpr -> node.operation.name
+    is CallableReferenceExpr -> node.callable.callableId
+    is SmartCastExpr -> render(node.expression)
+    is TryExpr -> "try (${render(node.tryBlock)})"
+    is CatchExpr -> "catch (${node.parameter.name}) ${render(node.body)}"
     is WhenExpr -> "when"
     is WhenEntryExpr -> "entry"
     is StringTemplateExpr -> node.parts.joinToString(transform = {
@@ -98,6 +113,10 @@ fun render(node: ExprNode): String = when (node) {
     is UnsupportedExpr -> "recovery: ${node.reason}"
 }
 ```
+
+Receiver references use the same `RefExpr` shape as every other reference. Their
+`kind` is `THIS` or `SUPER`; qualified receivers keep the source label in
+`label`, and `super<Type>` keeps the selected type in `qualifierType`.
 
 ## Capturing Lambdas in a DSL
 
@@ -206,9 +225,15 @@ and captured-value references; property access; function and operator calls;
 boolean logic; comparisons; equality checks; safe calls; Elvis expressions;
 blocks; nested lambdas; local declarations; assignments; expression-valued
 `if`; `try` expressions with catch clauses and finally blocks; subjectless and subject-style `when`; string templates;
-`is`/`!is`/`as`/`as?`; source spans; and shadowing. A subject-style
+`is`/`!is`/`as`/`as?`; source spans; shadowing; and labelled control transfers.
+Operator nodes retain the resolved callable ID and source operator token. Calls retain
+dispatch receivers, extension receivers, ordinary arguments, context arguments, and
+callable context-parameter metadata. A subject-style
 `when (value)` is represented by a `WhenSubject` that stores the initializer
 once and provides a stable local declaration for branch conditions.
+Positional destructuring is represented by one `DestructuringExpr` whose bindings
+retain declaration order and FIR `componentIndex`; name-based destructuring uses the
+same node with property-name metadata.
 
 Runtime APIs expose the tree to domain adapters, analyzers, transformers, and
 code generators. Adapters can use source spans and AST paths to report

@@ -38,6 +38,10 @@ data class CallableRef(
     val valueParameters: List<ValueParameterRef> = emptyList(),
     val isFakeOverride: Boolean = false,
     val overriddenCallableIds: List<String> = emptyList(),
+    /** Source-level token such as `+` or `<` when this callable came from operator syntax. */
+    val operatorToken: String? = null,
+    /** Parameters supplied through Kotlin context-parameter syntax. */
+    val contextParameters: List<ValueParameterRef> = emptyList(),
 ) {
     val name: String
         get() = callableId.substringAfterLast('.')
@@ -77,23 +81,33 @@ data class ConstExpr(
 data class RefExpr(
     override val id: ExprId,
     override val type: TypeRef,
-    val declaration: DeclId,
+    /** Declaration id for ordinary references; receiver references may not have one. */
+    val declaration: DeclId?,
     val name: String,
     val kind: RefKind,
     override val source: SourceSpan? = null,
     override val origin: OriginRef? = null,
+    /** Source label for qualified receivers such as `this@Outer` or `super@Outer`. */
+    val label: String? = null,
+    /** Explicit supertype selected by `super<Type>`; ordinary references leave this null. */
+    val qualifierType: TypeRef? = null,
 ) : ExprNode
 
 enum class RefKind { PARAMETER, LOCAL, CAPTURE, THIS, SUPER }
 
-data class PropertyGetExpr(
+data class PropertyAccessExpr(
     override val id: ExprId,
     override val type: TypeRef,
     val property: CallableRef,
     val receiver: ExprNode?,
+    val operation: PropertyAccessOperation = PropertyAccessOperation.GET,
+    val value: ExprNode? = null,
+    val assignmentOperator: AssignmentOperator = AssignmentOperator.SET,
     override val source: SourceSpan? = null,
     override val origin: OriginRef? = null,
 ) : ExprNode
+
+enum class PropertyAccessOperation { GET, SET }
 
 data class CallExpr(
     override val id: ExprId,
@@ -102,6 +116,81 @@ data class CallExpr(
     val dispatchReceiver: ExprNode?,
     val extensionReceiver: ExprNode?,
     val arguments: List<ExprNode>,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+    /** Arguments bound to the callable's context parameters. */
+    val contextArguments: List<ExprNode> = emptyList(),
+    /** FIR component index for positional destructuring calls. */
+    val componentIndex: Int? = null,
+) : ExprNode
+
+/** Indexed read such as `receiver[index]` or `receiver[i, j]`. */
+data class IndexAccessExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val callable: CallableRef,
+    val receiver: ExprNode,
+    val indices: List<ExprNode>,
+    val operation: IndexAccessOperation = IndexAccessOperation.GET,
+    val value: ExprNode? = null,
+    val assignmentOperator: AssignmentOperator = AssignmentOperator.SET,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+enum class IndexAccessOperation { GET, SET }
+
+/** Property write, retaining the resolved setter and assignment operation. */
+
+enum class DestructuringMode { POSITIONAL, NAME_BASED }
+
+/** A single binding in a FIR destructuring block, kept in source order. */
+data class DestructuringBinding(
+    val declaration: LocalDecl,
+    val initializer: ExprNode,
+    val componentIndex: Int? = null,
+    val propertyName: String? = null,
+    val source: SourceSpan? = null,
+)
+
+/** A positional or name-based destructuring declaration lowered by FIR. */
+data class DestructuringExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val initializer: ExprNode,
+    val entries: List<DestructuringBinding>,
+    val mode: DestructuringMode,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+data class IncDecExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val operand: ExprNode,
+    val operation: IncDecOperation,
+    val operator: CallableRef,
+    val prefix: Boolean,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+enum class IncDecOperation { INC, DEC }
+
+data class CallableReferenceExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val callable: CallableRef,
+    val receiver: ExprNode? = null,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+data class SmartCastExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val expression: ExprNode,
+    val smartCastType: TypeRef,
     override val source: SourceSpan? = null,
     override val origin: OriginRef? = null,
 ) : ExprNode
@@ -202,6 +291,96 @@ data class IfExpr(
     override val origin: OriginRef? = null,
 ) : ExprNode
 
+data class RangeExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val start: ExprNode,
+    val end: ExprNode,
+    val operation: RangeOperation,
+    val callable: CallableRef,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+enum class RangeOperation { RANGE_TO, RANGE_UNTIL, UNTIL, DOWN_TO }
+
+/** An explicit Kotlin return, preserving its optional label and value. */
+data class ReturnExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val value: ExprNode,
+    val targetId: ExprId? = null,
+    val targetLabel: String? = null,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+/** A loop with an optional source label. */
+data class WhileExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val condition: ExprNode,
+    val body: ExprNode,
+    val targetId: ExprId,
+    val label: String? = null,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+/** A post-test loop with an optional source label. */
+data class DoWhileExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val body: ExprNode,
+    val condition: ExprNode,
+    val targetId: ExprId,
+    val label: String? = null,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+/** A break transfer targeting the nearest or named loop. */
+data class BreakExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val targetId: ExprId? = null,
+    val targetLabel: String? = null,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+/** A continue transfer targeting the nearest or named loop. */
+data class ContinueExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val targetId: ExprId? = null,
+    val targetLabel: String? = null,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+/** A Kotlin `for (element in iterable)` loop. */
+data class ForLoopExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val declaration: LocalDecl,
+    val iterable: ExprNode,
+    val body: ExprNode,
+    val targetId: ExprId,
+    val label: String? = null,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
+/** A Kotlin `throw` transfer expression. */
+data class ThrowExpr(
+    override val id: ExprId,
+    override val type: TypeRef,
+    val value: ExprNode,
+    override val source: SourceSpan? = null,
+    override val origin: OriginRef? = null,
+) : ExprNode
+
 /** A Kotlin `try` expression with zero or more catches and an optional `finally` block. */
 data class TryExpr(
     override val id: ExprId,
@@ -291,6 +470,8 @@ data class UnsupportedExpr(
     val reason: String,
     override val source: SourceSpan? = null,
     override val origin: OriginRef? = null,
+    /** Original Kotlin source for runtime-side recovery or a secondary parser. */
+    val sourceText: String? = null,
 ) : ExprNode
 
 data class ParameterDecl(val id: DeclId, val name: String, val type: TypeRef, val isVararg: Boolean = false, val isCrossinline: Boolean = false, val isNoinline: Boolean = false)

@@ -1,6 +1,6 @@
 import com.kotlinorm.experimental.exprtree.api.CapturedExpr
 import com.kotlinorm.experimental.exprtree.api.ConstExpr
-import com.kotlinorm.experimental.exprtree.api.PropertyGetExpr
+import com.kotlinorm.experimental.exprtree.api.PropertyAccessExpr
 import com.kotlinorm.experimental.exprtree.api.RefExpr
 import com.kotlinorm.experimental.exprtree.api.RefKind
 import com.kotlinorm.experimental.exprtree.api.debugString
@@ -18,6 +18,16 @@ object CaptureFixtures {
 
 class CaptureOwner(val user: User) {
     fun captureMember() = expr<Int, User> { user }
+    fun captureExplicitThis() = expr<Int, User> { this@CaptureOwner.user }
+}
+
+open class SuperCaptureOwner {
+    open val user: User = User(48, "super")
+}
+
+class DerivedCaptureOwner : SuperCaptureOwner() {
+    override val user: User = User(49, "derived")
+    fun captureSuper() = expr<Int, User> { super.user }
 }
 
 fun localObjectCapture(): CapturedExpr<Int, User> {
@@ -55,7 +65,7 @@ fun box(): String {
     val topLevel = topLevelPropertyCapture()
     check(topLevel.captureValues.size == topLevel.tree.captures.size)
     if (topLevel.tree.captures.isNotEmpty()) error(topLevel.tree.debugString())
-    check(topLevel.tree.body is PropertyGetExpr)
+    check(topLevel.tree.body is PropertyAccessExpr)
 
     val chain = objectMemberChain()
     check(chain.captureValues.size == chain.tree.captures.size)
@@ -66,6 +76,19 @@ fun box(): String {
     check(member.captureValues.size == member.tree.captures.size)
     if (member.captureValues.singleOrNull() !is CaptureOwner) error(member.captureValues.toList().toString())
     if (member.tree.captures.single().captureKind.name != "THIS") error(member.tree.captures.toString())
+
+    val explicitThis = CaptureOwner(User(50, "labelled")).captureExplicitThis()
+    val thisRef = explicitThis.tree.body as? PropertyAccessExpr ?: error(explicitThis.tree.debugString())
+    check((thisRef.receiver as? RefExpr)?.kind == RefKind.THIS)
+    check((thisRef.receiver as? RefExpr)?.label == "CaptureOwner")
+
+    val superExpr = DerivedCaptureOwner().captureSuper()
+    val superRef = (superExpr.tree.body as? PropertyAccessExpr)?.receiver as? RefExpr
+        ?: error(superExpr.tree.debugString())
+    check(superRef.kind == RefKind.SUPER)
+    check(superRef.declaration != null)
+    check(superExpr.tree.captures.single().captureKind == com.kotlinorm.experimental.exprtree.api.CaptureKind.THIS)
+    check(superRef.qualifierType?.classifierId == "SuperCaptureOwner")
 
     val nested = nestedPropertyChain()
     check(nested.captureValues.size == nested.tree.captures.size)

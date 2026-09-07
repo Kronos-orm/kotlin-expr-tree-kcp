@@ -39,7 +39,9 @@ fun box(): String {
     check(nodes.any { it is WhenExpr })
     check(nodes.any { it is StringTemplateExpr })
     check(nodes.any { it is TypeOperatorExpr && it.operator == TypeOperator.AS })
-    if (!nodes.any { it is UnsupportedExpr && it.reason.contains("DesugaredAssignment") }) error(captured.tree.debugString())
+    if (!nodes.any { it is UnsupportedExpr && it.reason.contains("DesugaredAssignment") && !it.sourceText.isNullOrBlank() }) {
+        error(captured.tree.debugString())
+    }
 
     val safe = expr<String?, Boolean> { it?.isNotEmpty() == true }
     check(safe.tree.body.collect().any { it is SafeCallExpr })

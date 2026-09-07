@@ -73,7 +73,8 @@ fun render(node: ExprNode): String = when (node) {
     is ConstExpr -> node.value.toString()
     is RefExpr -> node.name
     is BinaryExpr -> "(${render(node.left)} ${node.operator.callableId} ${render(node.right)})"
-    is PropertyGetExpr -> node.property.callableId
+    is PropertyAccessExpr -> node.property.callableId
+    is IndexAccessExpr -> node.callable.callableId
     is CallExpr -> node.callable.callableId
     is UnaryExpr -> node.operator.callableId
     is SafeCallExpr -> render(node.receiver) + "?."
@@ -83,6 +84,20 @@ fun render(node: ExprNode): String = when (node) {
     is LocalDeclarationExpr -> node.declaration.name
     is AssignmentExpr -> node.operator.name
     is IfExpr -> "if (...)"
+    is ReturnExpr -> "return ${render(node.value)}"
+    is WhileExpr -> "while (...)"
+    is DoWhileExpr -> "do ... while (...)"
+    is BreakExpr -> "break"
+    is ContinueExpr -> "continue"
+    is ForLoopExpr -> "for (${node.declaration.name} in ${render(node.iterable)})"
+    is ThrowExpr -> "throw ${render(node.value)}"
+    is DestructuringExpr -> node.entries.joinToString(", ") { it.declaration.name }
+    is RangeExpr -> "${render(node.start)}..${render(node.end)}"
+    is IncDecExpr -> node.operation.name
+    is CallableReferenceExpr -> node.callable.callableId
+    is SmartCastExpr -> render(node.expression)
+    is TryExpr -> "try (${render(node.tryBlock)})"
+    is CatchExpr -> "catch (${node.parameter.name}) ${render(node.body)}"
     is WhenExpr -> "when"
     is WhenEntryExpr -> "entry"
     is StringTemplateExpr -> node.parts.joinToString(transform = {
@@ -95,6 +110,9 @@ fun render(node: ExprNode): String = when (node) {
     is UnsupportedExpr -> "recovery: ${node.reason}"
 }
 ```
+
+接收者引用统一使用 `RefExpr`。`kind` 为 `THIS` 或 `SUPER`；带限定符的接收者
+将源码标签保存在 `label` 中，`super<Type>` 选择的父类型保存在 `qualifierType` 中。
 
 ## 在 DSL 中捕获 Lambda
 
@@ -193,9 +211,15 @@ Maven 集成通过 Kotlin Maven 编译器插件扩展 `expr-tree-maven-plugin` �
 ## 当前支持的表达式
 
 编译器插件的测试样例（test fixtures）覆盖字面量、参数引用、局部变量引用、捕获值引用、属性访问、
-函数和操作符调用、布尔逻辑、比较、相等判断、安全调用（safe call）、Elvis 表达式、
+函数、中缀函数、扩展函数、context parameter 函数和操作符调用、布尔逻辑、比较、相等判断、安全调用（safe call）、Elvis 表达式、
 代码块（block）、嵌套 Lambda、局部声明、赋值、表达式形式的 `if`、无 subject 和有
-subject 的 `when`、带 catch 子句和 finally 块的 `try` 表达式、字符串模板、`is`/`!is`/`as`/`as?`、源码区间和名称遮蔽（shadowing）。
+subject 的 `when`、带 catch 子句和 finally 块的 `try` 表达式、字符串模板、`is`/`!is`/`as`/`as?`、源码区间、名称遮蔽（shadowing）以及带标签的控制转移。
+
+操作符节点同时保留解析后的 callable ID 和源码操作符 token。调用节点分别保存 dispatch receiver、extension receiver、普通参数和 context arguments，
+并在 callable 元数据中记录 context parameters。
+
+解构使用单个 `DestructuringExpr` 表示，binding 按源码声明顺序保存。位置解构保留
+FIR 的 `componentIndex`，name-based 解构保留属性名元数据。
 
 `when (value) { ... }` 会表示为 `WhenSubject`：树中保存一份 initializer，并提供稳定的局部
 声明供分支条件引用。

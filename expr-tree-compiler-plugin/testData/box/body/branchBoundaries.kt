@@ -41,6 +41,9 @@ fun box(): String {
     if (trees[0].tree.body !is ConstExpr || trees[1].tree.body !is ConstExpr || trees[2].tree.body !is ConstExpr) {
         error(trees.map { it.tree.body }.toString())
     }
+    val nullBody = trees[3].tree.body as? ConstExpr ?: error(trees[3].tree.debugString())
+    check(nullBody.value == null)
+    check(nullBody.type.nullability == com.kotlinorm.experimental.exprtree.api.Nullability.NULLABLE)
     if (trees[7].tree.body.collect().none { it is IfExpr }) error(trees[7].tree.debugString())
     if (ordinary { it + 1 } != 2) error("ordinary lambda was rewritten")
     if (trees.any { it.captureValues.size != it.tree.captures.size }) error("capture mismatch")

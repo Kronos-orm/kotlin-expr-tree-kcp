@@ -4,31 +4,49 @@ import com.kotlinorm.experimental.exprtree.api.BinaryExpr
 import com.kotlinorm.experimental.exprtree.api.BlockExpr
 import com.kotlinorm.experimental.exprtree.api.AssignmentExpr
 import com.kotlinorm.experimental.exprtree.api.AssignmentOperator
+import com.kotlinorm.experimental.exprtree.api.BreakExpr
 import com.kotlinorm.experimental.exprtree.api.CallExpr
 import com.kotlinorm.experimental.exprtree.api.CatchExpr
 import com.kotlinorm.experimental.exprtree.api.CallableKind
 import com.kotlinorm.experimental.exprtree.api.CallableRef
+import com.kotlinorm.experimental.exprtree.api.CallableReferenceExpr
+import com.kotlinorm.experimental.exprtree.api.DestructuringBinding
+import com.kotlinorm.experimental.exprtree.api.DestructuringExpr
+import com.kotlinorm.experimental.exprtree.api.DestructuringMode
 import com.kotlinorm.experimental.exprtree.api.CaptureDecl
 import com.kotlinorm.experimental.exprtree.api.CaptureKind
 import com.kotlinorm.experimental.exprtree.api.ConstExpr
+import com.kotlinorm.experimental.exprtree.api.ContinueExpr
 import com.kotlinorm.experimental.exprtree.api.DeclId
+import com.kotlinorm.experimental.exprtree.api.DoWhileExpr
 import com.kotlinorm.experimental.exprtree.api.ElvisExpr
 import com.kotlinorm.experimental.exprtree.api.ExprId
 import com.kotlinorm.experimental.exprtree.api.ExprNode
 import com.kotlinorm.experimental.exprtree.api.ExprTree
+import com.kotlinorm.experimental.exprtree.api.ForLoopExpr
 import com.kotlinorm.experimental.exprtree.api.LambdaExpr
 import com.kotlinorm.experimental.exprtree.api.IfExpr
+import com.kotlinorm.experimental.exprtree.api.IncDecExpr
+import com.kotlinorm.experimental.exprtree.api.IncDecOperation
+import com.kotlinorm.experimental.exprtree.api.IndexAccessExpr
+import com.kotlinorm.experimental.exprtree.api.IndexAccessOperation
 import com.kotlinorm.experimental.exprtree.api.LocalDecl
 import com.kotlinorm.experimental.exprtree.api.LocalDeclarationExpr
 import com.kotlinorm.experimental.exprtree.api.Nullability
 import com.kotlinorm.experimental.exprtree.api.ParameterDecl
-import com.kotlinorm.experimental.exprtree.api.PropertyGetExpr
+import com.kotlinorm.experimental.exprtree.api.PropertyAccessExpr
+import com.kotlinorm.experimental.exprtree.api.PropertyAccessOperation
 import com.kotlinorm.experimental.exprtree.api.RefExpr
 import com.kotlinorm.experimental.exprtree.api.RefKind
+import com.kotlinorm.experimental.exprtree.api.RangeExpr
+import com.kotlinorm.experimental.exprtree.api.RangeOperation
+import com.kotlinorm.experimental.exprtree.api.ReturnExpr
 import com.kotlinorm.experimental.exprtree.api.SafeCallExpr
+import com.kotlinorm.experimental.exprtree.api.SmartCastExpr
 import com.kotlinorm.experimental.exprtree.api.SourceSpan
 import com.kotlinorm.experimental.exprtree.api.TreeMetadata
 import com.kotlinorm.experimental.exprtree.api.TypeRef
+import com.kotlinorm.experimental.exprtree.api.ValueParameterRef
 import com.kotlinorm.experimental.exprtree.api.TryExpr
 import com.kotlinorm.experimental.exprtree.api.TypeOperator
 import com.kotlinorm.experimental.exprtree.api.TypeOperatorExpr
@@ -37,6 +55,8 @@ import com.kotlinorm.experimental.exprtree.api.UnsupportedExpr
 import com.kotlinorm.experimental.exprtree.api.WhenEntryExpr
 import com.kotlinorm.experimental.exprtree.api.WhenExpr
 import com.kotlinorm.experimental.exprtree.api.WhenSubject
+import com.kotlinorm.experimental.exprtree.api.ThrowExpr
+import com.kotlinorm.experimental.exprtree.api.WhileExpr
 import com.kotlinorm.experimental.exprtree.api.StringTemplateExpr
 import com.kotlinorm.experimental.exprtree.api.StringTemplatePart
 import org.jetbrains.kotlin.fir.FirElement
@@ -44,20 +64,28 @@ import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.expressions.FirAnonymousFunctionExpression
+import org.jetbrains.kotlin.fir.expressions.FirBreakExpression
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirBooleanOperatorExpression
 import org.jetbrains.kotlin.fir.expressions.FirCatch
 import org.jetbrains.kotlin.fir.expressions.FirComparisonExpression
+import org.jetbrains.kotlin.fir.expressions.FirContinueExpression
 import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirCheckedSafeCallSubject
 import org.jetbrains.kotlin.fir.expressions.FirElvisExpression
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
+import org.jetbrains.kotlin.fir.expressions.FirComponentCall
+import org.jetbrains.kotlin.fir.expressions.FirCallableReferenceAccess
+import org.jetbrains.kotlin.fir.expressions.FirIncrementDecrementExpression
 import org.jetbrains.kotlin.fir.expressions.FirLiteralExpression
 import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
+import org.jetbrains.kotlin.fir.expressions.FirThrowExpression
 import org.jetbrains.kotlin.fir.expressions.FirSafeCallExpression
+import org.jetbrains.kotlin.fir.expressions.FirSmartCastExpression
+import org.jetbrains.kotlin.fir.expressions.FirSuperReceiverExpression
 import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.expressions.FirStringConcatenationCall
 import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression
@@ -66,6 +94,8 @@ import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment
 import org.jetbrains.kotlin.fir.expressions.FirWhenBranch
 import org.jetbrains.kotlin.fir.expressions.FirWhenExpression
+import org.jetbrains.kotlin.fir.expressions.FirWhileLoop
+import org.jetbrains.kotlin.fir.expressions.FirDoWhileLoop
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
@@ -80,6 +110,7 @@ import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.FirTypeRef
 import org.jetbrains.kotlin.fir.types.isMarkedNullable
 import org.jetbrains.kotlin.fir.types.resolvedType
+import java.util.IdentityHashMap
 
 /**
  * Converts the resolved, supported FIR subset into compiler-independent nodes.
@@ -93,6 +124,7 @@ internal class FirExprExtractor private constructor(
 ) {
     private val capturesBySymbol = linkedMapOf<Any, CaptureDecl>()
     private val locals = linkedMapOf<FirVariableSymbol<*>, LocalDecl>()
+    private val controlTargets = IdentityHashMap<Any, ExprId>()
     private var safeCallReceiver: ExprNode? = null
 
     fun extractTree(lambda: FirAnonymousFunctionExpression): ExprTree<Any?, Any?> {
@@ -101,7 +133,7 @@ internal class FirExprExtractor private constructor(
         // The public tree represents the lambda result itself, not that compiler
         // control-flow wrapper.
         val body = function.body?.let(::lambdaBody)
-            ?: UnsupportedExpr(id(), TypeRef(null), "lambda-without-body", span(lambda))
+            ?: unsupported(lambda, "lambda-without-body")
         return ExprTree(
             parameters = function.valueParameters.map(::parameter),
             captures = capturesBySymbol.values.toList(),
@@ -115,16 +147,100 @@ internal class FirExprExtractor private constructor(
     }
 
     private fun lambdaBody(block: FirBlock): ExprNode {
-        val expressions = block.statements.mapNotNull(::extractStatement)
+        val expressions = normalizeForEach(normalizeDestructuring(block.statements.mapNotNull(::extractStatement)))
         return when (expressions.size) {
-            0 -> UnsupportedExpr(id(), typeOf(block), "lambda-empty-body", span(block))
+            0 -> unsupported(block, "lambda-empty-body")
             1 -> expressions.single()
             else -> BlockExpr(id(), typeOf(block), expressions, span(block))
         }
     }
 
+    private fun normalizeDestructuring(expressions: List<ExprNode>): List<ExprNode> {
+        if (expressions.size < 2) return expressions
+        val result = mutableListOf<ExprNode>()
+        var index = 0
+        while (index < expressions.size) {
+            val temporary = expressions[index] as? LocalDeclarationExpr
+            if (temporary?.declaration?.name?.startsWith("<destruct") != true) {
+                result += expressions[index++]
+                continue
+            }
+            val entries = mutableListOf<DestructuringBinding>()
+            var cursor = index + 1
+            while (cursor < expressions.size) {
+                val declaration = expressions[cursor] as? LocalDeclarationExpr ?: break
+                val initializer = declaration.initializer ?: break
+                val component = initializer as? CallExpr
+                val componentIndex = component?.componentIndex
+                val propertyName = component?.let { null } ?: (initializer as? PropertyAccessExpr)?.property?.name
+                if (componentIndex == null && propertyName == null) break
+                entries += DestructuringBinding(
+                    declaration = declaration.declaration,
+                    initializer = initializer,
+                    componentIndex = componentIndex,
+                    propertyName = propertyName,
+                    source = declaration.source,
+                )
+                cursor++
+            }
+            if (entries.isEmpty()) {
+                result += expressions[index++]
+            } else {
+                val mode = if (entries.any { it.componentIndex != null }) DestructuringMode.POSITIONAL else DestructuringMode.NAME_BASED
+                result += DestructuringExpr(temporary.id, temporary.type, requireNotNull(temporary.initializer), entries, mode, temporary.source)
+                index = cursor
+            }
+        }
+        return result
+    }
+
+    private fun normalizeForEach(expressions: List<ExprNode>): List<ExprNode> {
+        if (expressions.size < 2) return expressions
+        val result = mutableListOf<ExprNode>()
+        var index = 0
+        while (index < expressions.size) {
+            val iterator = expressions.getOrNull(index) as? LocalDeclarationExpr
+            val loop = expressions.getOrNull(index + 1) as? WhileExpr
+            val loopBody = (loop?.body as? BlockExpr)?.statements.orEmpty()
+            val element = loopBody.firstOrNull() as? LocalDeclarationExpr
+            val iteratorCall = iterator?.initializer as? CallExpr
+            val isIteratorLoop = iterator?.declaration?.name == "<iterator>" &&
+                loop != null && element != null &&
+                loop.condition is CallExpr &&
+                (loop.condition as CallExpr).callable.name == "hasNext" &&
+                iteratorCall?.callable?.name == "iterator"
+            if (isIteratorLoop) {
+                val bodyStatements = loopBody.drop(1)
+                val body = when (bodyStatements.size) {
+                    0 -> BlockExpr(loop.id, loop.type, emptyList(), loop.source)
+                    1 -> bodyStatements.single()
+                    else -> BlockExpr(loop.id, loop.type, bodyStatements, loop.source)
+                }
+                result += ForLoopExpr(
+                    id = loop.id,
+                    type = loop.type,
+                    declaration = element.declaration,
+                    iterable = requireNotNull(iteratorCall.extensionReceiver ?: iteratorCall.dispatchReceiver),
+                    body = body,
+                    targetId = loop.targetId,
+                    label = loop.label,
+                    source = loop.source,
+                )
+                index += 2
+            } else {
+                result += expressions[index]
+                index++
+            }
+        }
+        return result
+    }
+
     private fun extractStatement(statement: FirStatement): ExprNode? = when (statement) {
-        is FirReturnExpression -> extract(statement.result)
+        is FirReturnExpression -> returnExpression(statement)
+        is FirBreakExpression -> BreakExpr(id(), typeOf(statement), targetId(statement.target.labeledElement), statement.target.labelName, span(statement))
+        is FirContinueExpression -> ContinueExpr(id(), typeOf(statement), targetId(statement.target.labeledElement), statement.target.labelName, span(statement))
+        is FirWhileLoop -> whileLoop(statement)
+        is FirDoWhileLoop -> doWhileLoop(statement)
         is FirProperty -> localDeclaration(statement)
         is FirVariableAssignment -> assignment(statement)
         is FirExpression -> extract(statement)
@@ -150,23 +266,71 @@ internal class FirExprExtractor private constructor(
             expression.operation.operator,
             expression.argumentList.arguments,
             expression,
+            (expression.calleeReference as? FirResolvedNamedReference)?.resolvedSymbol,
         )
-        is FirBlock -> BlockExpr(id(), typeOf(expression), expression.statements.mapNotNull(::extractStatement), span(expression))
+        is FirBlock -> lambdaBody(expression)
         is FirPropertyAccessExpression -> property(expression)
         is FirFunctionCall -> call(expression)
+        is FirIncrementDecrementExpression -> increment(expression)
+        is FirCallableReferenceAccess -> callableReference(expression)
+        is FirSuperReceiverExpression -> superReceiver(expression)
+        is FirSmartCastExpression -> SmartCastExpr(id(), typeOf(expression), extract(expression.originalExpression), typeOf(expression.smartcastType), span(expression))
         is FirSafeCallExpression -> safeCall(expression)
         is FirElvisExpression -> ElvisExpr(id(), typeOf(expression), extract(expression.lhs), extract(expression.rhs), span(expression))
+        is FirReturnExpression -> returnExpression(expression)
+        is FirThrowExpression -> ThrowExpr(id(), typeOf(expression), extract(expression.exception), span(expression))
         is FirTryExpression -> tryExpression(expression)
         is FirWhenExpression -> whenExpression(expression)
         is FirStringConcatenationCall -> stringTemplate(expression)
         is FirTypeOperatorCall -> typeOperator(expression)
         is FirAnonymousFunctionExpression -> nestedLambda(expression)
         is FirThisReceiverExpression -> thisReceiver(expression)
-        is FirCheckedSafeCallSubject -> safeCallReceiver ?: UnsupportedExpr(
-            id(), typeOf(expression), "safe-call-subject-without-receiver", span(expression)
-        )
-        else -> UnsupportedExpr(id(), typeOf(expression), expression::class.simpleName ?: "unknown", span(expression))
+        is FirCheckedSafeCallSubject -> safeCallReceiver ?: unsupported(expression, "safe-call-subject-without-receiver")
+        else -> unsupported(expression, expression::class.simpleName ?: "unknown")
     }
+
+    private fun returnExpression(expression: FirReturnExpression): ExprNode {
+        val value = extract(expression.result)
+        val explicit = sourceElementTypeName(expression.source)?.contains("RETURN", ignoreCase = true) == true
+        return if (!explicit) value else ReturnExpr(
+            id = id(),
+            type = typeOf(expression),
+            value = value,
+            targetId = targetId(expression.target.labeledElement),
+            targetLabel = expression.target.labelName,
+            source = span(expression),
+        )
+    }
+
+    private fun whileLoop(expression: FirWhileLoop): ExprNode {
+        val targetId = id()
+        controlTargets[expression] = targetId
+        return WhileExpr(
+            id = targetId,
+            type = typeOf(expression),
+            condition = extract(expression.condition),
+            body = lambdaBody(expression.block),
+            targetId = targetId,
+            label = expression.label?.name,
+            source = span(expression),
+        )
+    }
+
+    private fun doWhileLoop(expression: FirDoWhileLoop): ExprNode {
+        val targetId = id()
+        controlTargets[expression] = targetId
+        return DoWhileExpr(
+            id = targetId,
+            type = typeOf(expression),
+            body = lambdaBody(expression.block),
+            condition = extract(expression.condition),
+            targetId = targetId,
+            label = expression.label?.name,
+            source = span(expression),
+        )
+    }
+
+    private fun targetId(target: Any?): ExprId? = target?.let(controlTargets::get)
 
     private fun localDeclaration(property: FirProperty): ExprNode {
         val declaration = LocalDecl(
@@ -179,14 +343,35 @@ internal class FirExprExtractor private constructor(
         return LocalDeclarationExpr(id(), typeOf(property), declaration, property.initializer?.let(::extract), span(property))
     }
 
-    private fun assignment(assignment: FirVariableAssignment): ExprNode = AssignmentExpr(
-        id = id(),
-        type = typeOf(assignment),
-        target = extract(assignment.lValue),
-        value = extract(assignment.rValue),
-        operator = assignmentOperator(assignment.rValue),
-        source = span(assignment),
-    )
+    private fun assignment(assignment: FirVariableAssignment): ExprNode {
+        val target = extract(assignment.lValue)
+        val value = extract(assignment.rValue)
+        if (target is PropertyAccessExpr) {
+            val propertyAccess = assignment.lValue as? FirPropertyAccessExpression
+            val symbol = (propertyAccess?.calleeReference as? FirResolvedNamedReference)?.resolvedSymbol as? FirPropertySymbol
+            val propertyName = propertyAccess?.calleeReference?.name?.asString() ?: target.property.name
+            return target.copy(
+                property = callable(symbol?.setterSymbol, "<set-$propertyName>").copy(callableId = "<set-$propertyName>"),
+                operation = PropertyAccessOperation.SET,
+                value = value,
+                assignmentOperator = assignmentOperator(assignment.rValue),
+                id = id(),
+                type = typeOf(assignment),
+                source = span(assignment),
+            )
+        }
+        if (target is IndexAccessExpr) {
+            return target.copy(
+                id = id(), type = typeOf(assignment), operation = IndexAccessOperation.SET,
+                value = value, assignmentOperator = assignmentOperator(assignment.rValue), source = span(assignment),
+            )
+        }
+        return AssignmentExpr(
+            id = id(), type = typeOf(assignment), target = target, value = value,
+            operator = assignmentOperator(assignment.rValue), source = span(assignment),
+        )
+    }
+
 
     private fun whenExpression(expression: FirWhenExpression): ExprNode {
         if (sourceElementTypeName(expression.source) == "IF") {
@@ -196,7 +381,7 @@ internal class FirExprExtractor private constructor(
             val elseBranch = entries.getOrNull(1)?.takeUnless { it.isElse }?.body ?: entries.getOrNull(1)?.body
             return IfExpr(
                 id(), typeOf(expression), first.conditions.singleOrNull()
-                    ?: UnsupportedExpr(id(), TypeRef(null), "if-without-condition", span(expression)),
+                    ?: unsupported(expression, "if-without-condition"),
                 first.body, elseBranch, span(expression),
             )
         }
@@ -275,13 +460,13 @@ internal class FirExprExtractor private constructor(
 
     private fun typeOperator(expression: FirTypeOperatorCall): ExprNode {
         val operand = expression.argumentList.arguments.singleOrNull()
-            ?: return UnsupportedExpr(id(), typeOf(expression), "type-operator-without-operand", span(expression))
+            ?: return unsupported(expression, "type-operator-without-operand")
         val operator = when (expression.operation.name) {
             "IS" -> TypeOperator.IS
             "NOT_IS" -> TypeOperator.IS_NOT
             "AS" -> TypeOperator.AS
             "SAFE_AS" -> TypeOperator.SAFE_AS
-            else -> return UnsupportedExpr(id(), typeOf(expression), "unsupported-type-operator:${expression.operation}", span(expression))
+            else -> return unsupported(expression, "unsupported-type-operator:${expression.operation}")
         }
         return TypeOperatorExpr(id(), typeOf(expression), operator, extract(operand), typeOf(expression.conversionTypeRef), span(expression))
     }
@@ -291,7 +476,7 @@ internal class FirExprExtractor private constructor(
         val oldReceiver = safeCallReceiver
         safeCallReceiver = receiver
         val selector = (expression.selector as? FirExpression)?.let(::extract)
-            ?: UnsupportedExpr(id(), typeOf(expression), "safe-call-non-expression-selector", span(expression))
+            ?: unsupported(expression, "safe-call-non-expression-selector")
         safeCallReceiver = oldReceiver
         return SafeCallExpr(id(), typeOf(expression), receiver, selector, span(expression))
     }
@@ -301,15 +486,16 @@ internal class FirExprExtractor private constructor(
         val receiver = compare.dispatchReceiver ?: compare.extensionReceiver ?: compare.explicitReceiver
         val argument = compare.argumentList.arguments.singleOrNull()
         if (receiver == null || argument == null) {
-            return UnsupportedExpr(id(), typeOf(expression), "comparison-without-operands", span(expression))
+            return unsupported(expression, "comparison-without-operands")
         }
         return BinaryExpr(
             id = id(),
             type = typeOf(expression),
             operator = CallableRef(
-                callableId = "kotlin.operator.${expression.operation.operator}",
+                callableId = callableSymbolId(compare.calleeReference, "compareTo"),
                 isOperator = true,
                 kind = CallableKind.OPERATOR,
+                operatorToken = expression.operation.operator,
             ),
             left = extract(receiver),
             right = extract(argument),
@@ -321,14 +507,20 @@ internal class FirExprExtractor private constructor(
         operator: String,
         operands: List<FirExpression>,
         expression: FirExpression,
+        symbol: Any? = null,
     ): ExprNode {
         if (operands.size != 2) {
-            return UnsupportedExpr(id(), typeOf(expression), "binary-operation-without-two-operands", span(expression))
+            return unsupported(expression, "binary-operation-without-two-operands")
         }
         return BinaryExpr(
             id = id(),
             type = typeOf(expression),
-            operator = CallableRef("kotlin.operator.$operator", isOperator = true, kind = CallableKind.OPERATOR),
+            operator = CallableRef(
+                callableId = callableSymbolId(symbol, "kotlin.operator.$operator"),
+                isOperator = true,
+                kind = CallableKind.OPERATOR,
+                operatorToken = operator,
+            ),
             left = extract(operands[0]),
             right = extract(operands[1]),
             source = span(expression),
@@ -365,8 +557,9 @@ internal class FirExprExtractor private constructor(
                     // Top-level properties and static object properties are not
                     // closure values. Preserve the resolved property reference so
                     // consumers can decide whether and when to evaluate it.
-                    PropertyGetExpr(
-                        id(), typeOf(expression), callable(symbol, expression.calleeReference.name.asString()), null, span(expression)
+                    PropertyAccessExpr(
+                        id(), typeOf(expression), callable(symbol, expression.calleeReference.name.asString()), null,
+                        source = span(expression),
                     )
                 } else {
                     val capture = capture(symbol, expression.calleeReference.name.asString(), typeOf(expression))
@@ -374,25 +567,32 @@ internal class FirExprExtractor private constructor(
                 }
             }
         }
-        return PropertyGetExpr(
-            id(), typeOf(expression), callable(symbol, expression.calleeReference.name.asString()), receiverNode, span(expression)
+        return PropertyAccessExpr(
+            id(), typeOf(expression), callable(symbol, expression.calleeReference.name.asString()), receiverNode,
+            source = span(expression),
         )
     }
 
     private fun thisReceiver(expression: FirThisReceiverExpression): ExprNode {
-        val name = expression.calleeReference.labelName.orEmpty().ifBlank { "this" }
-        val boundSymbol = expression.calleeReference.boundSymbol ?: return UnsupportedExpr(
-            id(), typeOf(expression), "this-without-bound-symbol", span(expression)
-        )
+        val label = expression.calleeReference.labelName
+        val boundSymbol = expression.calleeReference.boundSymbol ?: return unsupported(expression, "this-without-bound-symbol")
         val capture = capturesBySymbol.getOrPut(boundSymbol) {
             CaptureDecl(
                 id = ids.declaration(),
-                name = name,
+                name = "this",
                 type = typeOf(expression),
                 captureKind = CaptureKind.THIS,
             )
         }
-        return RefExpr(id(), typeOf(expression), capture.id, capture.name, RefKind.THIS, span(expression))
+        return RefExpr(
+            id = id(),
+            type = typeOf(expression),
+            declaration = capture.id,
+            name = "this",
+            kind = RefKind.THIS,
+            source = span(expression),
+            label = label,
+        )
     }
 
     private fun call(expression: FirFunctionCall): ExprNode {
@@ -401,15 +601,28 @@ internal class FirExprExtractor private constructor(
         val extension = expression.extensionReceiver?.takeUnless { it is FirCheckedSafeCallSubject }?.let(::extract)
         val receiver = dispatch ?: extension ?: expression.explicitReceiver?.takeUnless { it is FirCheckedSafeCallSubject }?.let(::extract)
         val args = expression.argumentList.arguments.map { extract(it) }
+        val contextArgs = expression.contextArguments.map(::extract)
         val name = expression.calleeReference.name.asString()
         val callable = callable(symbol, name)
+        if (name == "get" && isIndexedAccess(expression) && receiver != null) {
+            return IndexAccessExpr(id(), typeOf(expression), callable, receiver, args, source = span(expression))
+        }
+        if (name == "set" && isIndexedAssignment(expression) && receiver != null && args.isNotEmpty()) {
+            return IndexAccessExpr(id(), typeOf(expression), callable, receiver, args.dropLast(1), IndexAccessOperation.SET, args.last(), source = span(expression))
+        }
+        if (receiver != null && args.size == 1 && name in RANGE_OPERATOR_NAMES) {
+            return RangeExpr(
+                id = id(), type = typeOf(expression), start = receiver, end = args.single(),
+                operation = rangeOperation(name), callable = callable.copy(operatorToken = rangeToken(name)), source = span(expression),
+            )
+        }
         if (receiver != null && args.size == 1 && name in BINARY_OPERATOR_NAMES) {
             return BinaryExpr(id(), typeOf(expression), callable, receiver, args.single(), span(expression))
         }
         if (receiver != null && args.isEmpty() && name in UNARY_OPERATOR_NAMES) {
             return UnaryExpr(id(), typeOf(expression), callable, receiver, span(expression))
         }
-        return CallExpr(id(), typeOf(expression), callable, dispatch ?: receiver, extension, args, span(expression))
+        return CallExpr(id(), typeOf(expression), callable, dispatch, extension ?: if (dispatch == null) receiver else null, args, span(expression), null, contextArgs, (expression as? FirComponentCall)?.componentIndex)
     }
 
     private fun parameter(parameter: FirValueParameter): ParameterDecl {
@@ -451,7 +664,93 @@ internal class FirExprExtractor private constructor(
                 else -> CallableKind.UNKNOWN
             },
             receiverType = callableSymbol?.resolvedReceiverType?.let(::typeOf),
+            operatorToken = if (operator) operatorToken(fallback) else null,
+            contextParameters = callableSymbol?.fir?.contextParameters.orEmpty().mapIndexed { index, parameter ->
+                ValueParameterRef(
+                    name = parameter.name.asString(),
+                    type = typeOf(parameter.returnTypeRef),
+                    index = index,
+                    hasDefault = parameter.defaultValue != null,
+                    isVararg = parameter.isVararg,
+                )
+            },
         )
+    }
+
+    private fun increment(expression: FirIncrementDecrementExpression): ExprNode = IncDecExpr(
+        id = id(),
+        type = typeOf(expression),
+        operand = extract(expression.expression),
+        operation = when (expression.operationName.asString()) {
+            "inc" -> IncDecOperation.INC
+            "dec" -> IncDecOperation.DEC
+            else -> IncDecOperation.INC
+        },
+        operator = callable(null, expression.operationName.asString()),
+        prefix = expression.isPrefix,
+        source = span(expression),
+    )
+
+    private fun callableReference(expression: FirCallableReferenceAccess): ExprNode {
+        val symbol = (expression.calleeReference as? FirResolvedNamedReference)?.resolvedSymbol
+        val receiver = expression.explicitReceiver?.takeUnless { it is FirResolvedQualifier }?.let(::extract)
+            ?: expression.extensionReceiver?.let(::extract)
+            ?: expression.dispatchReceiver?.let(::extract)
+        return CallableReferenceExpr(id(), typeOf(expression), callable(symbol, expression.calleeReference.name.asString()), receiver, span(expression))
+    }
+
+    private fun superReceiver(expression: FirSuperReceiverExpression): ExprNode = RefExpr(
+        id = id(),
+        type = typeOf(expression),
+        declaration = (expression.dispatchReceiver?.let(::extract) as? RefExpr)?.declaration,
+        name = "super",
+        kind = RefKind.SUPER,
+        source = span(expression),
+        label = expression.calleeReference.labelName,
+        qualifierType = typeOf(expression.calleeReference.superTypeRef),
+    )
+
+    private fun callableSymbolId(reference: Any?, fallback: String): String = when (reference) {
+        is FirResolvedNamedReference -> (reference.resolvedSymbol as? FirCallableSymbol<*>)
+            ?.callableId?.asSingleFqName()?.asString() ?: fallback
+        else -> (reference as? FirCallableSymbol<*>)?.callableId?.asSingleFqName()?.asString() ?: fallback
+    }
+
+    private fun operatorToken(name: String): String? = when (name) {
+        "plus" -> "+"
+        "minus" -> "-"
+        "times" -> "*"
+        "div" -> "/"
+        "rem" -> "%"
+        "compareTo" -> "<=>"
+        "equals" -> "=="
+        "and" -> "&"
+        "or" -> "|"
+        "xor" -> "^"
+        "rangeTo" -> ".."
+        "contains" -> "in"
+        "unaryPlus" -> "+"
+        "unaryMinus" -> "-"
+        "not" -> "!"
+        "inc" -> "++"
+        "dec" -> "--"
+        else -> null
+    }
+
+    private fun rangeOperation(name: String): RangeOperation = when (name) {
+        "rangeTo" -> RangeOperation.RANGE_TO
+        "rangeUntil" -> RangeOperation.RANGE_UNTIL
+        "until" -> RangeOperation.UNTIL
+        "downTo" -> RangeOperation.DOWN_TO
+        else -> error("Unknown range operation $name")
+    }
+
+    private fun rangeToken(name: String): String = when (name) {
+        "rangeTo" -> ".."
+        "rangeUntil" -> "..<"
+        "until" -> "until"
+        "downTo" -> "downTo"
+        else -> name
     }
 
     private fun id(): ExprId = ids.expression()
@@ -473,14 +772,25 @@ internal class FirExprExtractor private constructor(
     }
 
     private fun span(element: FirElement): SourceSpan? = spanFrom(
-        when (element) {
-            is FirStatement -> element.source
-            is FirDeclaration -> element.source
-            is FirCatch -> element.source
-            is FirWhenBranch -> element.source
-            else -> null
-        }
+        sourceElement(element)
     )
+
+    private fun unsupported(element: FirElement, reason: String): UnsupportedExpr = UnsupportedExpr(
+        id = id(),
+        type = typeOf(element),
+        reason = reason,
+        source = span(element),
+        sourceText = sourceText(element),
+    )
+
+    private fun sourceElement(element: FirElement): Any? = element.source
+
+    /** Extracts the exact source fragment when the compiler exposes PSI through KtSourceElement. */
+    private fun sourceText(element: FirElement): String? = runCatching {
+        val source = sourceElement(element) ?: return@runCatching null
+        val psiText = invoke(source, "getPsi")?.let { invokeString(it, "getText") }
+        psiText ?: invokeString(source, "getElementTextInContextForDebug")
+    }.getOrNull()
 
     /** Keeps source metadata without exposing compiler PSI classes in the runtime model. */
     private fun spanFrom(source: Any?): SourceSpan? {
@@ -503,6 +813,13 @@ internal class FirExprExtractor private constructor(
             ?.invoke(source)
             ?.toString()
     }.getOrNull()
+
+    private fun isIndexedAccess(expression: FirFunctionCall): Boolean {
+        return sourceText(expression).orEmpty().contains(Regex("\\[[^]]*]"))
+    }
+
+    private fun isIndexedAssignment(expression: FirFunctionCall): Boolean =
+        sourceText(expression).orEmpty().contains(Regex("\\[[^]]*]\\s*="))
 
     private fun assignmentOperator(rValue: FirExpression): AssignmentOperator {
         val operationName = (rValue as? FirFunctionCall)?.calleeReference?.name?.asString()
@@ -544,6 +861,7 @@ internal class FirExprExtractor private constructor(
             "rangeTo", "contains",
         )
         private val UNARY_OPERATOR_NAMES = setOf("unaryPlus", "unaryMinus", "not", "inc", "dec")
+        private val RANGE_OPERATOR_NAMES = setOf("rangeTo", "rangeUntil", "until", "downTo")
 
         fun fromLambda(lambda: FirAnonymousFunctionExpression): ExprTree<Any?, Any?> {
             val values = lambda.anonymousFunction.valueParameters

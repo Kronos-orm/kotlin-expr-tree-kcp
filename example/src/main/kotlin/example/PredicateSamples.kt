@@ -1,7 +1,6 @@
 package example
 
 import com.kotlinorm.experimental.exprtree.api.expr
-import example.User
 
 data class User(val age: Int, val name: String?)
 
@@ -45,4 +44,10 @@ fun subjectWhenSample(limit: Int, suffix: String) = expr<Int, String> { value ->
 fun sampleWithLambdaLocal(minAge: Int) = expr<User, Boolean> { user ->
     val age = user.age
     age >= minAge
+}
+
+val user = User(1, "John")
+fun main(){
+    val b = expr<Int, User> { user }
+    print(b)
 }

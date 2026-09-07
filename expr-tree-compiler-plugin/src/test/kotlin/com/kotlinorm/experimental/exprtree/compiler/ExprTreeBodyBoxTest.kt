@@ -14,4 +14,19 @@ class ExprTreeBodyBoxTest : AbstractExprTreeJvmBoxSuite("body") {
 
     @Test
     fun tryCatchFinally() = box("tryCatchFinally")
+
+    @Test
+    fun controlTransfers() = box("controlTransfers")
+
+    @Test
+    fun operatorAndInfix() = box("operatorAndInfix")
+
+    @Test
+    fun destructuring() = box("destructuring")
+
+    @Test
+    fun ranges() = box("ranges")
+
+    @Test
+    fun indexAccess() = box("indexAccess")
 }
