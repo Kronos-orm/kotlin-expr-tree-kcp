@@ -1,10 +1,10 @@
 import com.kotlinorm.experimental.exprtree.api.BreakExpr
 import com.kotlinorm.experimental.exprtree.api.ContinueExpr
-import com.kotlinorm.experimental.exprtree.api.DoWhileExpr
+import com.kotlinorm.experimental.exprtree.api.DoWhileLoopExpr
 import com.kotlinorm.experimental.exprtree.api.ForLoopExpr
 import com.kotlinorm.experimental.exprtree.api.ReturnExpr
 import com.kotlinorm.experimental.exprtree.api.ThrowExpr
-import com.kotlinorm.experimental.exprtree.api.WhileExpr
+import com.kotlinorm.experimental.exprtree.api.WhileLoopExpr
 import com.kotlinorm.experimental.exprtree.api.collect
 import com.kotlinorm.experimental.exprtree.api.debugString
 import com.kotlinorm.experimental.exprtree.api.expr
@@ -29,14 +29,14 @@ fun captureControlTransfers(limit: Int) = expr<Int, Int> { value ->
 fun box(): String {
     val tree = captureControlTransfers(10).tree
     val nodes = tree.body.collect()
-    check(nodes.any { it is WhileExpr })
-    check(nodes.any { it is DoWhileExpr })
+    check(nodes.any { it is WhileLoopExpr })
+    check(nodes.any { it is DoWhileLoopExpr })
     check(nodes.any { it is ForLoopExpr }) { tree.debugString() }
     check(nodes.any { it is BreakExpr })
     check(nodes.any { it is ContinueExpr })
     check(nodes.any { it is ReturnExpr })
     check(nodes.any { it is ThrowExpr })
-    val loop = nodes.filterIsInstance<WhileExpr>().single()
+    val loop = nodes.filterIsInstance<WhileLoopExpr>().single()
     check(nodes.filterIsInstance<BreakExpr>().any { it.targetId == loop.targetId && it.targetLabel == "outer" })
     check(nodes.filterIsInstance<ContinueExpr>().any { it.targetId == loop.targetId && it.targetLabel == "outer" })
     return "OK"

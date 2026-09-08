@@ -85,8 +85,8 @@ fun render(node: ExprNode): String = when (node) {
     is AssignmentExpr -> node.operator.name
     is IfExpr -> "if (...)"
     is ReturnExpr -> "return ${render(node.value)}"
-    is WhileExpr -> "while (...)"
-    is DoWhileExpr -> "do ... while (...)"
+    is WhileLoopExpr -> "while (...)"
+    is DoWhileLoopExpr -> "do ... while (...)"
     is BreakExpr -> "break"
     is ContinueExpr -> "continue"
     is ForLoopExpr -> "for (${node.declaration.name} in ${render(node.iterable)})"
@@ -97,7 +97,6 @@ fun render(node: ExprNode): String = when (node) {
     is CallableReferenceExpr -> node.callable.callableId
     is SmartCastExpr -> render(node.expression)
     is TryExpr -> "try (${render(node.tryBlock)})"
-    is CatchExpr -> "catch (${node.parameter.name}) ${render(node.body)}"
     is WhenExpr -> "when"
     is WhenEntryExpr -> "entry"
     is StringTemplateExpr -> node.parts.joinToString(transform = {
@@ -113,6 +112,10 @@ fun render(node: ExprNode): String = when (node) {
 
 接收者引用统一使用 `RefExpr`。`kind` 为 `THIS` 或 `SUPER`；带限定符的接收者
 将源码标签保存在 `label` 中，`super<Type>` 选择的父类型保存在 `qualifierType` 中。
+
+`CallableRef.parameters` 通过 `ParameterKind` 同时记录普通参数和 context 参数；
+`CallableRef.typeParameters` 记录泛型名称、型变、reified 标记与上界。解析后的类型
+通过 `TypeRef.arguments` 递归保留泛型实参。
 
 ## 在 DSL 中捕获 Lambda
 

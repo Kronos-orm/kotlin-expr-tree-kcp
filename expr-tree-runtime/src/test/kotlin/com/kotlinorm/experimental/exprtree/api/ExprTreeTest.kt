@@ -61,6 +61,26 @@ class ExprTreeTest {
     }
 
     @Test
+    fun `callable metadata distinguishes parameter kinds and generic declarations`() {
+        val callable = CallableRef(
+            callableId = "example.fold",
+            parameters = listOf(
+                ParameterRef("initial", TypeRef("T"), 0),
+                ParameterRef("context", TypeRef("example.Context"), 0, ParameterKind.CONTEXT),
+            ),
+            typeParameters = listOf(
+                TypeParameterRef("T", Variance.OUT, isReified = true, upperBounds = listOf(TypeRef("kotlin.Any"))),
+            ),
+        )
+
+        assertEquals(listOf(ParameterKind.VALUE, ParameterKind.CONTEXT), callable.parameters.map { it.kind })
+        assertEquals("T", callable.typeParameters.single().name)
+        assertEquals(Variance.OUT, callable.typeParameters.single().variance)
+        assertTrue(callable.typeParameters.single().isReified)
+        assertEquals("kotlin.Any", callable.typeParameters.single().upperBounds.single().classifierId)
+    }
+
+    @Test
     fun `visitor reaches every node family and transformer preserves unchanged subtrees`() {
         val leaf = ConstExpr(ExprId(1), TypeRef("kotlin.Int"), 1)
         val nodes: List<ExprNode> = listOf(
@@ -87,9 +107,9 @@ class ExprTreeTest {
             AssignmentExpr(ExprId(13), TypeRef("kotlin.Unit"), RefExpr(ExprId(14), TypeRef("kotlin.Int"), DeclId(12), "local", RefKind.LOCAL), leaf),
             IfExpr(ExprId(15), TypeRef("kotlin.Int"), leaf, leaf, leaf),
             TryExpr(
-                ExprId(16), TypeRef("kotlin.Int"), leaf,
-                listOf(CatchExpr(ExprId(17), TypeRef("kotlin.Int"), LocalDecl(DeclId(17), "failure", TypeRef("kotlin.Throwable")), leaf)),
-                leaf,
+                ExprId(16), TypeRef("kotlin.Int"), BlockExpr(ExprId(17), leaf.type, listOf(leaf)),
+                listOf(CatchClause(LocalDecl(DeclId(17), "failure", TypeRef("kotlin.Throwable")), BlockExpr(ExprId(18), leaf.type, listOf(leaf)))),
+                BlockExpr(ExprId(19), leaf.type, listOf(leaf)),
             ),
             WhenEntryExpr(ExprId(18), TypeRef("kotlin.Int"), listOf(leaf), leaf),
             WhenExpr(
@@ -101,8 +121,8 @@ class ExprTreeTest {
             StringTemplateExpr(ExprId(21), TypeRef("kotlin.String"), listOf(StringTemplatePart.Text("value="), StringTemplatePart.Expression(leaf))),
             TypeOperatorExpr(ExprId(22), TypeRef("kotlin.Boolean"), TypeOperator.IS, leaf, TypeRef("kotlin.String")),
             ReturnExpr(ExprId(101), TypeRef("kotlin.Nothing"), leaf, targetId = ExprId(99), targetLabel = "exit"),
-            WhileExpr(ExprId(102), TypeRef("kotlin.Unit"), leaf, leaf, ExprId(102), label = "loop"),
-            DoWhileExpr(ExprId(103), TypeRef("kotlin.Unit"), leaf, leaf, ExprId(103), label = "post"),
+            WhileLoopExpr(ExprId(102), TypeRef("kotlin.Unit"), leaf, leaf, ExprId(102), label = "loop"),
+            DoWhileLoopExpr(ExprId(103), TypeRef("kotlin.Unit"), leaf, leaf, ExprId(103), label = "post"),
             BreakExpr(ExprId(104), TypeRef("kotlin.Nothing"), ExprId(102), "loop"),
             ContinueExpr(ExprId(105), TypeRef("kotlin.Nothing"), ExprId(103), "post"),
             ForLoopExpr(ExprId(106), TypeRef("kotlin.Unit"), LocalDecl(DeclId(106), "item", leaf.type), leaf, leaf, ExprId(106), "each"),
@@ -125,7 +145,7 @@ class ExprTreeTest {
         assertTrue(debug.contains("AssignmentExpr"))
         assertTrue(debug.contains("IfExpr"))
         assertTrue(debug.contains("TryExpr"))
-        assertTrue(debug.contains("CatchExpr"))
+        assertTrue(debug.contains("TryExpr"))
         assertTrue(debug.contains("WhenExpr"))
         assertTrue(debug.contains("StringTemplateExpr"))
         assertTrue(debug.contains("TypeOperatorExpr"))

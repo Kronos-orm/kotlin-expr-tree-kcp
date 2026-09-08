@@ -6,13 +6,13 @@ import com.kotlinorm.experimental.exprtree.api.AssignmentExpr
 import com.kotlinorm.experimental.exprtree.api.BreakExpr
 import com.kotlinorm.experimental.exprtree.api.CallExpr
 import com.kotlinorm.experimental.exprtree.api.CallableReferenceExpr
-import com.kotlinorm.experimental.exprtree.api.CatchExpr
+import com.kotlinorm.experimental.exprtree.api.CatchClause
 import com.kotlinorm.experimental.exprtree.api.CallableKind
 import com.kotlinorm.experimental.exprtree.api.ConstExpr
 import com.kotlinorm.experimental.exprtree.api.ElvisExpr
 import com.kotlinorm.experimental.exprtree.api.ContinueExpr
 import com.kotlinorm.experimental.exprtree.api.DestructuringExpr
-import com.kotlinorm.experimental.exprtree.api.DoWhileExpr
+import com.kotlinorm.experimental.exprtree.api.DoWhileLoopExpr
 import com.kotlinorm.experimental.exprtree.api.ExprNode
 import com.kotlinorm.experimental.exprtree.api.ExprTree
 import com.kotlinorm.experimental.exprtree.api.IfExpr
@@ -38,7 +38,7 @@ import com.kotlinorm.experimental.exprtree.api.UnsupportedExpr
 import com.kotlinorm.experimental.exprtree.api.WhenEntryExpr
 import com.kotlinorm.experimental.exprtree.api.WhenExpr
 import com.kotlinorm.experimental.exprtree.api.WhenSubject
-import com.kotlinorm.experimental.exprtree.api.WhileExpr
+import com.kotlinorm.experimental.exprtree.api.WhileLoopExpr
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
@@ -249,14 +249,13 @@ private class ExprTreeIrEmitter(
         is AssignmentExpr -> new("com.kotlinorm.experimental.exprtree.api.AssignmentExpr", exprId(value.id.value), type(value.type), node(value.target), node(value.value), enum("com.kotlinorm.experimental.exprtree.api.AssignmentOperator", value.operator.name), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is IfExpr -> new("com.kotlinorm.experimental.exprtree.api.IfExpr", exprId(value.id.value), type(value.type), node(value.condition), node(value.thenBranch), value.elseBranch?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprNode"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is ReturnExpr -> new("com.kotlinorm.experimental.exprtree.api.ReturnExpr", exprId(value.id.value), type(value.type), node(value.value), value.targetId?.let { exprId(it.value) } ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprId"), value.targetLabel?.let(builder::irString) ?: nullOf("kotlin.String"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
-        is WhileExpr -> new("com.kotlinorm.experimental.exprtree.api.WhileExpr", exprId(value.id.value), type(value.type), node(value.condition), node(value.body), exprId(value.targetId.value), value.label?.let(builder::irString) ?: nullOf("kotlin.String"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
-        is DoWhileExpr -> new("com.kotlinorm.experimental.exprtree.api.DoWhileExpr", exprId(value.id.value), type(value.type), node(value.body), node(value.condition), exprId(value.targetId.value), value.label?.let(builder::irString) ?: nullOf("kotlin.String"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
+        is WhileLoopExpr -> new("com.kotlinorm.experimental.exprtree.api.WhileLoopExpr", exprId(value.id.value), type(value.type), node(value.condition), node(value.body), exprId(value.targetId.value), value.label?.let(builder::irString) ?: nullOf("kotlin.String"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
+        is DoWhileLoopExpr -> new("com.kotlinorm.experimental.exprtree.api.DoWhileLoopExpr", exprId(value.id.value), type(value.type), node(value.body), node(value.condition), exprId(value.targetId.value), value.label?.let(builder::irString) ?: nullOf("kotlin.String"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is BreakExpr -> new("com.kotlinorm.experimental.exprtree.api.BreakExpr", exprId(value.id.value), type(value.type), value.targetId?.let { exprId(it.value) } ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprId"), value.targetLabel?.let(builder::irString) ?: nullOf("kotlin.String"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is ContinueExpr -> new("com.kotlinorm.experimental.exprtree.api.ContinueExpr", exprId(value.id.value), type(value.type), value.targetId?.let { exprId(it.value) } ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprId"), value.targetLabel?.let(builder::irString) ?: nullOf("kotlin.String"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is ForLoopExpr -> new("com.kotlinorm.experimental.exprtree.api.ForLoopExpr", exprId(value.id.value), type(value.type), local(value.declaration), node(value.iterable), node(value.body), exprId(value.targetId.value), value.label?.let(builder::irString) ?: nullOf("kotlin.String"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is ThrowExpr -> new("com.kotlinorm.experimental.exprtree.api.ThrowExpr", exprId(value.id.value), type(value.type), node(value.value), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
-        is TryExpr -> new("com.kotlinorm.experimental.exprtree.api.TryExpr", exprId(value.id.value), type(value.type), node(value.tryBlock), list("com.kotlinorm.experimental.exprtree.api.CatchExpr", value.catches.map(::node)), value.finallyBlock?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.ExprNode"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
-        is CatchExpr -> new("com.kotlinorm.experimental.exprtree.api.CatchExpr", exprId(value.id.value), type(value.type), local(value.parameter), node(value.body), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
+        is TryExpr -> new("com.kotlinorm.experimental.exprtree.api.TryExpr", exprId(value.id.value), type(value.type), node(value.tryBlock), list("com.kotlinorm.experimental.exprtree.api.CatchClause", value.catches.map(::catchClause)), value.finallyBlock?.let(::node) ?: nullOf("com.kotlinorm.experimental.exprtree.api.BlockExpr"), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is WhenEntryExpr -> new("com.kotlinorm.experimental.exprtree.api.WhenEntryExpr", exprId(value.id.value), type(value.type), list("com.kotlinorm.experimental.exprtree.api.ExprNode", value.conditions.map(::node)), node(value.body), builder.irBoolean(value.isElse), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is WhenExpr -> new("com.kotlinorm.experimental.exprtree.api.WhenExpr", exprId(value.id.value), type(value.type), value.subject?.let(::whenSubject) ?: nullOf("com.kotlinorm.experimental.exprtree.api.WhenSubject"), list("com.kotlinorm.experimental.exprtree.api.WhenEntryExpr", value.entries.map(::node)), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
         is StringTemplateExpr -> new("com.kotlinorm.experimental.exprtree.api.StringTemplateExpr", exprId(value.id.value), type(value.type), list("com.kotlinorm.experimental.exprtree.api.StringTemplatePart", value.parts.map(::stringPart)), source(value.source), nullOf("com.kotlinorm.experimental.exprtree.api.OriginRef"))
@@ -268,14 +267,25 @@ private class ExprTreeIrEmitter(
     private fun callable(value: com.kotlinorm.experimental.exprtree.api.CallableRef): IrExpression = new(
         "com.kotlinorm.experimental.exprtree.api.CallableRef", builder.irString(value.callableId), builder.irBoolean(value.isOperator),
         enum("com.kotlinorm.experimental.exprtree.api.CallableKind", value.kind.name), nullOf("kotlin.String"),
-        nullOf("com.kotlinorm.experimental.exprtree.api.TypeRef"), list(anyN, emptyList()), builder.irBoolean(false),
-        list("kotlin.String", emptyList()), value.operatorToken?.let(builder::irString) ?: nullOf("kotlin.String"),
-        list("com.kotlinorm.experimental.exprtree.api.ValueParameterRef", value.contextParameters.map(::valueParameter)),
+        nullOf("com.kotlinorm.experimental.exprtree.api.TypeRef"),
+        list("com.kotlinorm.experimental.exprtree.api.ParameterRef", value.parameters.map(::parameter)),
+        list("com.kotlinorm.experimental.exprtree.api.TypeParameterRef", value.typeParameters.map(::typeParameter)),
+        builder.irBoolean(false), list("kotlin.String", emptyList()), value.operatorToken?.let(builder::irString) ?: nullOf("kotlin.String"),
     )
 
-    private fun valueParameter(value: com.kotlinorm.experimental.exprtree.api.ValueParameterRef) = new(
-        "com.kotlinorm.experimental.exprtree.api.ValueParameterRef", builder.irString(value.name), type(value.type), builder.irInt(value.index),
-        builder.irBoolean(value.hasDefault), builder.irBoolean(value.isVararg),
+    private fun parameter(value: com.kotlinorm.experimental.exprtree.api.ParameterRef) = new(
+        "com.kotlinorm.experimental.exprtree.api.ParameterRef", builder.irString(value.name), type(value.type), builder.irInt(value.index),
+        enum("com.kotlinorm.experimental.exprtree.api.ParameterKind", value.kind.name), builder.irBoolean(value.hasDefault), builder.irBoolean(value.isVararg),
+    )
+
+    private fun typeParameter(value: com.kotlinorm.experimental.exprtree.api.TypeParameterRef) = new(
+        "com.kotlinorm.experimental.exprtree.api.TypeParameterRef", builder.irString(value.name),
+        enum("com.kotlinorm.experimental.exprtree.api.Variance", value.variance.name), builder.irBoolean(value.isReified),
+        list("com.kotlinorm.experimental.exprtree.api.TypeRef", value.upperBounds.map(::type)),
+    )
+
+    private fun catchClause(value: CatchClause) = new(
+        "com.kotlinorm.experimental.exprtree.api.CatchClause", local(value.parameter), node(value.body), source(value.source),
     )
 
     private fun binding(value: com.kotlinorm.experimental.exprtree.api.DestructuringBinding) = new(

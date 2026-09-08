@@ -1,8 +1,9 @@
-import com.kotlinorm.experimental.exprtree.api.CatchExpr
 import com.kotlinorm.experimental.exprtree.api.IfExpr
 import com.kotlinorm.experimental.exprtree.api.LocalDeclarationExpr
+import com.kotlinorm.experimental.exprtree.api.BlockExpr
 import com.kotlinorm.experimental.exprtree.api.TryExpr
 import com.kotlinorm.experimental.exprtree.api.collect
+import com.kotlinorm.experimental.exprtree.api.debugString
 import com.kotlinorm.experimental.exprtree.api.expr
 
 fun captureTryCatchFinally(limit: Int, suffix: String) = expr<Int, String> { value ->
@@ -39,14 +40,16 @@ fun box(): String {
     check(captured.tree.captures.map { it.name } == listOf("limit", "suffix"))
     if (!captured.captureValues.contentEquals(arrayOf<Any?>(2, "total"))) error(captured.captureValues.toList().toString())
 
-    val tree = captured.tree.body as? TryExpr ?: error(captured.tree.body.toString())
+    val tree = captured.tree.body as? TryExpr ?: error(captured.tree.debugString())
     check(tree.catches.size == 2)
     check(tree.finallyBlock != null)
+    check(tree.tryBlock is BlockExpr)
+    check(tree.catches.all { it.body is BlockExpr })
     check(tree.catches.map { it.parameter.name } == listOf("failure", "failure"))
     check(tree.catches.all { it.parameter.type.classifierId?.contains("Illegal") == true })
 
     val nodes = tree.collect()
-    check(nodes.count { it is CatchExpr } == 2)
+    check(tree.catches.size == 2)
     check(nodes.any { it is LocalDeclarationExpr })
     check(nodes.any { it is IfExpr })
 

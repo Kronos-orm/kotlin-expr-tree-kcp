@@ -35,12 +35,11 @@ fun ExprNode.children(): List<ExprNode> = when (this) {
     is AssignmentExpr -> listOf(target, value)
     is IfExpr -> listOfNotNull(condition, thenBranch, elseBranch)
     is ReturnExpr -> listOf(value)
-    is WhileExpr -> listOf(condition, body)
-    is DoWhileExpr -> listOf(body, condition)
+    is WhileLoopExpr -> listOf(condition, body)
+    is DoWhileLoopExpr -> listOf(body, condition)
     is ForLoopExpr -> listOf(iterable, body)
     is ThrowExpr -> listOf(value)
-    is TryExpr -> listOf(tryBlock) + catches + listOfNotNull(finallyBlock)
-    is CatchExpr -> listOf(body)
+    is TryExpr -> listOf(tryBlock) + catches.map { it.body } + listOfNotNull(finallyBlock)
     is WhenEntryExpr -> conditions + body
     is WhenExpr -> listOfNotNull(subject?.initializer) + entries
     is StringTemplateExpr -> parts.mapNotNull { (it as? StringTemplatePart.Expression)?.expression }
@@ -74,16 +73,15 @@ fun <C> ExprNode.transformChildren(transformer: ExprTransformer<C>, context: C):
         is AssignmentExpr -> copy(target = t(target), value = t(value))
         is IfExpr -> copy(condition = t(condition), thenBranch = t(thenBranch), elseBranch = elseBranch?.let(::t))
         is ReturnExpr -> copy(value = t(value))
-        is WhileExpr -> copy(condition = t(condition), body = t(body))
-        is DoWhileExpr -> copy(body = t(body), condition = t(condition))
+        is WhileLoopExpr -> copy(condition = t(condition), body = t(body))
+        is DoWhileLoopExpr -> copy(body = t(body), condition = t(condition))
         is ForLoopExpr -> copy(iterable = t(iterable), body = t(body))
         is ThrowExpr -> copy(value = t(value))
         is TryExpr -> copy(
             tryBlock = t(tryBlock),
-            catches = catches.map { t(it) as CatchExpr },
-            finallyBlock = finallyBlock?.let(::t),
+            catches = catches.map { it.copy(body = t(it.body) as BlockExpr) },
+            finallyBlock = finallyBlock?.let { t(it) as BlockExpr },
         )
-        is CatchExpr -> copy(body = t(body))
         is WhenEntryExpr -> copy(conditions = conditions.map(::t), body = t(body))
         is WhenExpr -> copy(
             subject = subject?.copy(initializer = t(subject.initializer)),
@@ -205,14 +203,13 @@ fun ExprTree<*, *>.debugString(): String = buildString {
             is LocalDeclarationExpr -> append(" ").append(if (node.declaration.mutable) "var " else "val ").append(node.declaration.name)
             is IfExpr -> append(" if")
             is ReturnExpr -> append(" return").append(node.targetLabel?.let { "@$it" } ?: "")
-            is WhileExpr -> append(" while").append(node.label?.let { "@$it" } ?: "")
-            is DoWhileExpr -> append(" do-while").append(node.label?.let { "@$it" } ?: "")
+            is WhileLoopExpr -> append(" while").append(node.label?.let { "@$it" } ?: "")
+            is DoWhileLoopExpr -> append(" do-while").append(node.label?.let { "@$it" } ?: "")
             is ForLoopExpr -> append(" for").append(node.label?.let { "@$it" } ?: "")
             is BreakExpr -> append(" break").append(node.targetLabel?.let { "@$it" } ?: "")
             is ContinueExpr -> append(" continue").append(node.targetLabel?.let { "@$it" } ?: "")
             is ThrowExpr -> append(" throw")
             is TryExpr -> append(" try")
-            is CatchExpr -> append(" catch ").append(node.parameter.name)
             is WhenExpr -> append(" when").append(if (node.subject == null) "" else " subject=" + node.subject.declaration.name)
             is WhenEntryExpr -> append(if (node.isElse) " else" else " entry")
             is StringTemplateExpr -> append(" parts=").append(node.parts.size)

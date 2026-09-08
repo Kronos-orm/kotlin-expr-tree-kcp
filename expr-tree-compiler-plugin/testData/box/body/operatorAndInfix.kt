@@ -30,6 +30,10 @@ fun contextExpression(): CapturedExpr<Int, Int> = expr { contextAdd(it) }
 
 fun referencedValue(value: Int): Int = value + 1
 
+fun <T : Comparable<T>> genericIdentity(value: T): T = value
+
+fun genericCallExpression() = expr<Int, Int> { genericIdentity(it) }
+
 fun callableReferenceExpression() = expr<Int, (Int) -> Int> { ::referencedValue }
 
 fun operatorFamilies() = expr<Int, Boolean> {
@@ -54,8 +58,13 @@ fun box(): String {
     check(plus.operator.callableId.endsWith("OperatorValue.plus"))
 
     val contextCall = with(ContextValue(3)) { contextExpression() }.tree.body.collect().filterIsInstance<CallExpr>().single()
-    check(contextCall.callable.contextParameters.size == 1)
+    check(contextCall.callable.parameters.count { it.kind.name == "CONTEXT" } == 1)
     check(contextCall.contextArguments.size == 1)
+
+    val generic = genericCallExpression().tree.body.collect().filterIsInstance<CallExpr>().single { it.callable.name == "genericIdentity" }
+    check(generic.callable.parameters.single().type.classifierId?.contains("T") == true)
+    check(generic.callable.typeParameters.single().name == "T")
+    check(generic.callable.typeParameters.single().upperBounds.single().classifierId?.contains("Comparable") == true)
 
     val reference = callableReferenceExpression().tree.body.collect().filterIsInstance<CallableReferenceExpr>().single()
     check(reference.callable.name == "referencedValue")

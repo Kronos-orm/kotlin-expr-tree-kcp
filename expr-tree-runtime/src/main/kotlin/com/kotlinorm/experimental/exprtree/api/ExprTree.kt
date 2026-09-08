@@ -35,13 +35,12 @@ data class CallableRef(
     val kind: CallableKind = CallableKind.FUNCTION,
     val jvmSignature: String? = null,
     val receiverType: TypeRef? = null,
-    val valueParameters: List<ValueParameterRef> = emptyList(),
+    val parameters: List<ParameterRef> = emptyList(),
+    val typeParameters: List<TypeParameterRef> = emptyList(),
     val isFakeOverride: Boolean = false,
     val overriddenCallableIds: List<String> = emptyList(),
     /** Source-level token such as `+` or `<` when this callable came from operator syntax. */
     val operatorToken: String? = null,
-    /** Parameters supplied through Kotlin context-parameter syntax. */
-    val contextParameters: List<ValueParameterRef> = emptyList(),
 ) {
     val name: String
         get() = callableId.substringAfterLast('.')
@@ -49,10 +48,22 @@ data class CallableRef(
 
 enum class CallableKind { FUNCTION, PROPERTY, GETTER, SETTER, CONSTRUCTOR, OPERATOR, CLASSIFIER, UNKNOWN }
 
-data class ValueParameterRef(
+enum class ParameterKind { VALUE, CONTEXT }
+
+data class TypeParameterRef(
+    val name: String,
+    val variance: Variance = Variance.INVARIANT,
+    val isReified: Boolean = false,
+    val upperBounds: List<TypeRef> = emptyList(),
+)
+
+enum class Variance { INVARIANT, IN, OUT }
+
+data class ParameterRef(
     val name: String,
     val type: TypeRef,
     val index: Int,
+    val kind: ParameterKind = ParameterKind.VALUE,
     val hasDefault: Boolean = false,
     val isVararg: Boolean = false,
 )
@@ -316,7 +327,7 @@ data class ReturnExpr(
 ) : ExprNode
 
 /** A loop with an optional source label. */
-data class WhileExpr(
+data class WhileLoopExpr(
     override val id: ExprId,
     override val type: TypeRef,
     val condition: ExprNode,
@@ -328,7 +339,7 @@ data class WhileExpr(
 ) : ExprNode
 
 /** A post-test loop with an optional source label. */
-data class DoWhileExpr(
+data class DoWhileLoopExpr(
     override val id: ExprId,
     override val type: TypeRef,
     val body: ExprNode,
@@ -386,21 +397,18 @@ data class TryExpr(
     override val id: ExprId,
     override val type: TypeRef,
     val tryBlock: ExprNode,
-    val catches: List<CatchExpr>,
-    val finallyBlock: ExprNode? = null,
+    val catches: List<CatchClause>,
+    val finallyBlock: BlockExpr? = null,
     override val source: SourceSpan? = null,
     override val origin: OriginRef? = null,
 ) : ExprNode
 
 /** A `catch` clause within a [TryExpr]. */
-data class CatchExpr(
-    override val id: ExprId,
-    override val type: TypeRef,
+data class CatchClause(
     val parameter: LocalDecl,
-    val body: ExprNode,
-    override val source: SourceSpan? = null,
-    override val origin: OriginRef? = null,
-) : ExprNode
+    val body: BlockExpr,
+    val source: SourceSpan? = null,
+)
 
 /** A single branch in a [WhenExpr]. Conditions are empty only for an `else` branch. */
 data class WhenEntryExpr(

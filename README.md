@@ -88,8 +88,8 @@ fun render(node: ExprNode): String = when (node) {
     is AssignmentExpr -> node.operator.name
     is IfExpr -> "if (...)"
     is ReturnExpr -> "return ${render(node.value)}"
-    is WhileExpr -> "while (...)"
-    is DoWhileExpr -> "do ... while (...)"
+    is WhileLoopExpr -> "while (...)"
+    is DoWhileLoopExpr -> "do ... while (...)"
     is BreakExpr -> "break"
     is ContinueExpr -> "continue"
     is ForLoopExpr -> "for (${node.declaration.name} in ${render(node.iterable)})"
@@ -100,7 +100,6 @@ fun render(node: ExprNode): String = when (node) {
     is CallableReferenceExpr -> node.callable.callableId
     is SmartCastExpr -> render(node.expression)
     is TryExpr -> "try (${render(node.tryBlock)})"
-    is CatchExpr -> "catch (${node.parameter.name}) ${render(node.body)}"
     is WhenExpr -> "when"
     is WhenEntryExpr -> "entry"
     is StringTemplateExpr -> node.parts.joinToString(transform = {
@@ -117,6 +116,11 @@ fun render(node: ExprNode): String = when (node) {
 Receiver references use the same `RefExpr` shape as every other reference. Their
 `kind` is `THIS` or `SUPER`; qualified receivers keep the source label in
 `label`, and `super<Type>` keeps the selected type in `qualifierType`.
+
+`CallableRef.parameters` records ordinary and context parameters through
+`ParameterKind`; `CallableRef.typeParameters` records generic names, variance,
+reification, and upper bounds. Resolved types preserve generic arguments
+recursively through `TypeRef.arguments`.
 
 ## Capturing Lambdas in a DSL
 

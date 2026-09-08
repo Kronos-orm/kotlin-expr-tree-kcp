@@ -6,7 +6,7 @@ import com.kotlinorm.experimental.exprtree.api.AssignmentExpr
 import com.kotlinorm.experimental.exprtree.api.AssignmentOperator
 import com.kotlinorm.experimental.exprtree.api.BreakExpr
 import com.kotlinorm.experimental.exprtree.api.CallExpr
-import com.kotlinorm.experimental.exprtree.api.CatchExpr
+import com.kotlinorm.experimental.exprtree.api.CatchClause
 import com.kotlinorm.experimental.exprtree.api.CallableKind
 import com.kotlinorm.experimental.exprtree.api.CallableRef
 import com.kotlinorm.experimental.exprtree.api.CallableReferenceExpr
@@ -18,7 +18,7 @@ import com.kotlinorm.experimental.exprtree.api.CaptureKind
 import com.kotlinorm.experimental.exprtree.api.ConstExpr
 import com.kotlinorm.experimental.exprtree.api.ContinueExpr
 import com.kotlinorm.experimental.exprtree.api.DeclId
-import com.kotlinorm.experimental.exprtree.api.DoWhileExpr
+import com.kotlinorm.experimental.exprtree.api.DoWhileLoopExpr
 import com.kotlinorm.experimental.exprtree.api.ElvisExpr
 import com.kotlinorm.experimental.exprtree.api.ExprId
 import com.kotlinorm.experimental.exprtree.api.ExprNode
@@ -46,7 +46,10 @@ import com.kotlinorm.experimental.exprtree.api.SmartCastExpr
 import com.kotlinorm.experimental.exprtree.api.SourceSpan
 import com.kotlinorm.experimental.exprtree.api.TreeMetadata
 import com.kotlinorm.experimental.exprtree.api.TypeRef
-import com.kotlinorm.experimental.exprtree.api.ValueParameterRef
+import com.kotlinorm.experimental.exprtree.api.TypeParameterRef
+import com.kotlinorm.experimental.exprtree.api.Variance
+import com.kotlinorm.experimental.exprtree.api.ParameterRef
+import com.kotlinorm.experimental.exprtree.api.ParameterKind
 import com.kotlinorm.experimental.exprtree.api.TryExpr
 import com.kotlinorm.experimental.exprtree.api.TypeOperator
 import com.kotlinorm.experimental.exprtree.api.TypeOperatorExpr
@@ -56,11 +59,12 @@ import com.kotlinorm.experimental.exprtree.api.WhenEntryExpr
 import com.kotlinorm.experimental.exprtree.api.WhenExpr
 import com.kotlinorm.experimental.exprtree.api.WhenSubject
 import com.kotlinorm.experimental.exprtree.api.ThrowExpr
-import com.kotlinorm.experimental.exprtree.api.WhileExpr
+import com.kotlinorm.experimental.exprtree.api.WhileLoopExpr
 import com.kotlinorm.experimental.exprtree.api.StringTemplateExpr
 import com.kotlinorm.experimental.exprtree.api.StringTemplatePart
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.expressions.FirAnonymousFunctionExpression
@@ -155,6 +159,11 @@ internal class FirExprExtractor private constructor(
         }
     }
 
+    private fun blockBody(block: FirBlock): BlockExpr {
+        val body = lambdaBody(block)
+        return body as? BlockExpr ?: BlockExpr(id(), typeOf(block), listOf(body), span(block))
+    }
+
     private fun normalizeDestructuring(expressions: List<ExprNode>): List<ExprNode> {
         if (expressions.size < 2) return expressions
         val result = mutableListOf<ExprNode>()
@@ -200,7 +209,7 @@ internal class FirExprExtractor private constructor(
         var index = 0
         while (index < expressions.size) {
             val iterator = expressions.getOrNull(index) as? LocalDeclarationExpr
-            val loop = expressions.getOrNull(index + 1) as? WhileExpr
+            val loop = expressions.getOrNull(index + 1) as? WhileLoopExpr
             val loopBody = (loop?.body as? BlockExpr)?.statements.orEmpty()
             val element = loopBody.firstOrNull() as? LocalDeclarationExpr
             val iteratorCall = iterator?.initializer as? CallExpr
@@ -305,7 +314,7 @@ internal class FirExprExtractor private constructor(
     private fun whileLoop(expression: FirWhileLoop): ExprNode {
         val targetId = id()
         controlTargets[expression] = targetId
-        return WhileExpr(
+        return WhileLoopExpr(
             id = targetId,
             type = typeOf(expression),
             condition = extract(expression.condition),
@@ -319,7 +328,7 @@ internal class FirExprExtractor private constructor(
     private fun doWhileLoop(expression: FirDoWhileLoop): ExprNode {
         val targetId = id()
         controlTargets[expression] = targetId
-        return DoWhileExpr(
+        return DoWhileLoopExpr(
             id = targetId,
             type = typeOf(expression),
             body = lambdaBody(expression.block),
@@ -410,13 +419,13 @@ internal class FirExprExtractor private constructor(
     private fun tryExpression(expression: FirTryExpression): ExprNode = TryExpr(
         id = id(),
         type = typeOf(expression),
-        tryBlock = lambdaBody(expression.tryBlock),
+        tryBlock = blockBody(expression.tryBlock),
         catches = expression.catches.map(::catchClause),
-        finallyBlock = expression.finallyBlock?.let(::lambdaBody),
+        finallyBlock = expression.finallyBlock?.let(::blockBody),
         source = span(expression),
     )
 
-    private fun catchClause(catch: org.jetbrains.kotlin.fir.expressions.FirCatch): CatchExpr {
+    private fun catchClause(catch: org.jetbrains.kotlin.fir.expressions.FirCatch): CatchClause {
         val parameter = catch.parameter
         val declaration = LocalDecl(
             id = ids.declaration(),
@@ -426,11 +435,9 @@ internal class FirExprExtractor private constructor(
         )
         val previous = locals.put(parameter.symbol, declaration)
         return try {
-            CatchExpr(
-                id = id(),
-                type = typeOf(catch.block),
+            CatchClause(
                 parameter = declaration,
-                body = lambdaBody(catch.block),
+                body = blockBody(catch.block),
                 source = span(catch),
             )
         } finally {
@@ -654,6 +661,7 @@ internal class FirExprExtractor private constructor(
         val callableSymbol = symbol as? FirCallableSymbol<*>
         val callableId = callableSymbol?.callableId?.asSingleFqName()?.asString() ?: fallback
         val operator = fallback in BINARY_OPERATOR_NAMES || fallback in UNARY_OPERATOR_NAMES
+        val function = callableSymbol?.fir as? FirFunction
         return CallableRef(
             callableId = callableId,
             isOperator = operator,
@@ -665,13 +673,36 @@ internal class FirExprExtractor private constructor(
             },
             receiverType = callableSymbol?.resolvedReceiverType?.let(::typeOf),
             operatorToken = if (operator) operatorToken(fallback) else null,
-            contextParameters = callableSymbol?.fir?.contextParameters.orEmpty().mapIndexed { index, parameter ->
-                ValueParameterRef(
+            parameters = function?.valueParameters.orEmpty().mapIndexed { index, parameter ->
+                ParameterRef(
                     name = parameter.name.asString(),
                     type = typeOf(parameter.returnTypeRef),
                     index = index,
+                    kind = ParameterKind.VALUE,
                     hasDefault = parameter.defaultValue != null,
                     isVararg = parameter.isVararg,
+                )
+            } + function?.contextParameters.orEmpty().mapIndexed { index, parameter ->
+                ParameterRef(
+                    name = parameter.name.asString(),
+                    type = typeOf(parameter.returnTypeRef),
+                    index = index,
+                    kind = ParameterKind.CONTEXT,
+                    hasDefault = parameter.defaultValue != null,
+                    isVararg = parameter.isVararg,
+                )
+            },
+            typeParameters = function?.typeParameters.orEmpty().map { parameter ->
+                val symbol = parameter.symbol
+                TypeParameterRef(
+                    name = symbol.name.asString(),
+                    variance = when (symbol.variance.name) {
+                        "IN_VARIANCE" -> Variance.IN
+                        "OUT_VARIANCE" -> Variance.OUT
+                        else -> Variance.INVARIANT
+                    },
+                    isReified = symbol.isReified,
+                    upperBounds = symbol.resolvedBounds.map(::typeOf),
                 )
             },
         )
