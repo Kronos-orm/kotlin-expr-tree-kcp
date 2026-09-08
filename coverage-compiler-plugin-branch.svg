@@ -1,0 +1,20 @@
+<svg width="200.6" height="20" viewBox="0 0 2006 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="compiler branch coverage: 70.8%">
+  <title>compiler branch coverage: 70.8%</title>
+  <linearGradient id="a" x2="0" y2="100%">
+    <stop offset="0" stop-opacity=".1" stop-color="#EEE"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <mask id="m"><rect width="2006" height="200" rx="30" fill="#FFF"/></mask>
+  <g mask="url(#m)">
+    <rect width="1536" height="200" fill="#555"/>
+    <rect width="470" height="200" fill="#brightgreen" x="1536"/>
+    <rect width="2006" height="200" fill="url(#a)"/>
+  </g>
+  <g aria-hidden="true" fill="#fff" text-anchor="start" font-family="Verdana,DejaVu Sans,sans-serif" font-size="110">
+    <text x="60" y="148" textLength="1436" fill="#000" opacity="0.25">compiler branch coverage</text>
+    <text x="50" y="138" textLength="1436">compiler branch coverage</text>
+    <text x="1591" y="148" textLength="370" fill="#000" opacity="0.25">70.8%</text>
+    <text x="1581" y="138" textLength="370">70.8%</text>
+  </g>
+  
+</svg>
